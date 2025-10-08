@@ -159,8 +159,8 @@ export default function AdminBlobsPage() {
         <p>💡 Tips:</p>
         <ul className="list-disc list-inside mt-2 space-y-1">
           <li>Files are named with application UUIDs (e.g., uuid.pdf)</li>
-          <li>Click "View" to open the CV in a new tab</li>
-          <li>Click "Download" to save the file locally</li>
+          <li>Click &quot;View&quot; to open the CV in a new tab</li>
+          <li>Click &quot;Download&quot; to save the file locally</li>
           <li>Files with Application ID can be traced back to database records</li>
         </ul>
       </div>
