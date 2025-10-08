@@ -14,59 +14,70 @@ export async function POST(request: NextRequest) {
   if (rateLimitResponse) return addSecurityHeaders(rateLimitResponse)
 
   try {
-    // Check if this is the legacy format (like your old Apps Script API)
-    const contentType = request.headers.get('content-type') || ''
-    
-    // Legacy format check - looks for api_key in parameters
+    // Parse URL parameters (matches Google Apps Script format)
     const url = new URL(request.url)
-    const apiKey = url.searchParams.get('api_key') || request.headers.get('api_key')
+    const apiKey = url.searchParams.get('api_key')
+    const jobTitle = url.searchParams.get('job_title')
     
-    if (apiKey === LEGACY_API_KEY) {
-      return handleLegacyUpload(request)
+    // Security check - matches original UploadAPI.gs
+    if (!apiKey || apiKey !== LEGACY_API_KEY) {
+      return addSecurityHeaders(NextResponse.json({
+        status: 'error', 
+        message: 'Unauthorized'
+      }, { status: 401 }))
     }
-    
-    return NextResponse.json(
-      { error: 'Invalid API key or format' },
-      { status: 401 }
-    )
+
+    // Check for required job_title parameter
+    if (!jobTitle) {
+      return addSecurityHeaders(NextResponse.json({
+        status: 'error', 
+        message: 'Missing Job_Title'
+      }, { status: 400 }))
+    }
+
+    return await handleLegacyUpload(request, jobTitle)
     
   } catch (error) {
     console.error('Legacy upload error:', error)
-    return NextResponse.json(
-      { error: 'Upload failed', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+    return addSecurityHeaders(NextResponse.json({
+      status: 'error', 
+      message: error instanceof Error ? error.message : 'Upload failed'
+    }, { status: 500 }))
   }
 }
 
-async function handleLegacyUpload(request: NextRequest) {
+async function handleLegacyUpload(request: NextRequest, jobTitle: string) {
   try {
-    const url = new URL(request.url)
-    const jobTitle = url.searchParams.get('job_title')
-    
-    if (!jobTitle) {
-      return NextResponse.json(
-        { status: 'error', message: 'Missing Job_Title' },
-        { status: 400 }
-      )
-    }
-
-    // Check if we have postData (base64 file content)
+    // Get request body (should be base64 encoded file data like Google Apps Script)
     const body = await request.text()
     let fileData: Buffer | null = null
     let contentType = 'application/pdf'
     
     if (body) {
       try {
-        // Try to decode as base64 (like old Apps Script)
+        // Decode base64 data (matches Google Apps Script format)
         fileData = Buffer.from(body, 'base64')
+        
+        // Try to determine content type from first few bytes
+        if (fileData.length > 0) {
+          const header = fileData.toString('hex', 0, 8).toUpperCase()
+          if (header.startsWith('25504446')) { // PDF signature
+            contentType = 'application/pdf'
+          } else if (header.startsWith('504B0304')) { // ZIP/DOCX signature
+            contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          } else if (header.startsWith('D0CF11E0')) { // DOC signature
+            contentType = 'application/msword'
+          }
+        }
       } catch {
-        // If not base64, treat as binary data
-        fileData = Buffer.from(body)
+        return addSecurityHeaders(NextResponse.json({
+          status: 'error',
+          message: 'Invalid file data format'
+        }, { status: 400 }))
       }
     }
 
-    // Create application first to get UUID
+    // Create application first to get UUID (matches Google Apps Script behavior)
     const application = await prisma.application.create({
       data: {
         job_title: jobTitle,
@@ -77,24 +88,23 @@ async function handleLegacyUpload(request: NextRequest) {
       }
     })
 
-    let cv_file_url = null
+    let cv_file_url = ''
+    let fileName = ''
 
     // Upload file if we have data
     if (fileData && fileData.length > 0) {
-      // Determine file extension from content or default to PDF
+      // Determine file extension
       const extension = contentType.includes('pdf') ? 'pdf' : 
                       contentType.includes('msword') ? 'doc' : 
                       contentType.includes('wordprocessingml') ? 'docx' : 'pdf'
       
-      const filename = `${application.id}.${extension}`
+      fileName = `${application.id}.${extension}`
       
       try {
-        // Create a File-like object from buffer
-        const file = new File([new Uint8Array(fileData)], filename, { type: contentType })
-        
         // Upload to Vercel Blob
-        const blob = await put(filename, file, {
+        const blob = await put(fileName, fileData, {
           access: 'public',
+          contentType: contentType
         })
         
         cv_file_url = blob.url
@@ -112,12 +122,12 @@ async function handleLegacyUpload(request: NextRequest) {
       }
     }
 
-    // Return response in old format
+    // Return response matching Google Apps Script format exactly
     const response = NextResponse.json({
       status: 'success',
-      fileId: application.id,
-      fileName: cv_file_url ? `${application.id}.pdf` : '',
-      fileUrl: cv_file_url || '',
+      fileId: application.id, // UUID like Google Apps Script
+      fileName: fileName,
+      fileUrl: cv_file_url,
       jobTitle: jobTitle
     })
     
@@ -125,9 +135,9 @@ async function handleLegacyUpload(request: NextRequest) {
 
   } catch (error) {
     console.error('Legacy upload processing error:', error)
-    return NextResponse.json({
+    return addSecurityHeaders(NextResponse.json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Upload processing failed'
-    })
+    }, { status: 500 }))
   }
 }

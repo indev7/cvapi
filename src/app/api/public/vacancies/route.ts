@@ -9,22 +9,21 @@ export async function GET() {
         status: 'active' // Only show active positions
       },
       select: {
-        id: true,
         job_title: true,
-        url: true,
-        description: true,
-        created_at: true
-        // No sensitive data exposed
+        url: true
       },
       orderBy: {
         created_at: 'desc'
       }
     })
 
-    return NextResponse.json({
-      vacancies,
-      total: vacancies.length
-    })
+    // Transform to match original Google Apps Script format
+    const formattedVacancies = vacancies.map(vacancy => ({
+      Job_Title: vacancy.job_title,
+      URL: vacancy.url
+    }))
+
+    return NextResponse.json(formattedVacancies)
   } catch (error) {
     console.error('Error fetching public vacancies:', error)
     return NextResponse.json(
