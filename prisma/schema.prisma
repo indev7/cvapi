@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vacancy {
+  id          Int      @id @default(autoincrement())
+  job_title   String   @db.VarChar(255)
+  url         String?  @db.Text
+  description String?  @db.Text
+  status      String   @default("active") @db.VarChar(50)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+  
+  // Relations
+  applications Application[]
+  
+  @@map("vacancies")
+}
+
+model Application {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String?   @db.VarChar(255)
+  phone        String?   @db.VarChar(50)
+  job_title    String    @db.VarChar(255)
+  vacancy_id   Int?      
+  cv_file_url  String?   @db.Text
+  source       String    @default("web") @db.VarChar(50) // 'web', 'referral', 'manual'
+  status       String    @default("pending") @db.VarChar(50)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
+  
+  // Relations
+  vacancy      Vacancy?    @relation(fields: [vacancy_id], references: [id])
+  ranking      CvRanking?
+  
+  @@map("applications")
+}
+
+model CvRanking {
+  id                         Int      @id @default(autoincrement())
+  application_id             String   @unique @db.Uuid
+  education_score            Int      @default(0)
+  education_evidence         String?  @db.Text
+  work_experience_score      Int      @default(0)
+  work_experience_evidence   String?  @db.Text
+  skill_match_score          Int      @default(0)
+  skill_match_evidence       String?  @db.Text
+  certifications_score       Int      @default(0)
+  certifications_evidence    String?  @db.Text
+  domain_knowledge_score     Int      @default(0)
+  domain_knowledge_evidence  String?  @db.Text
+  soft_skills_score          Int      @default(0)
+  soft_skills_evidence       String?  @db.Text
+  total_score                Int      @default(0)
+  final_score                Decimal  @default(0) @db.Decimal(5,4)
+  summary                    String?  @db.Text
+  ranked_at                  DateTime @default(now())
+  
+  // Relations
+  application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  
+  @@map("cv_rankings")
+}
+
+model Referral {
+  id          Int      @id @default(autoincrement())
+  email       String   @db.VarChar(255)
+  phone       String?  @db.VarChar(50)
+  job_title   String   @db.VarChar(255)
+  cv_file_url String?  @db.Text
+  copied      Boolean  @default(false)
+  created_at  DateTime @default(now())
+  
+  @@map("referrals")
+}
