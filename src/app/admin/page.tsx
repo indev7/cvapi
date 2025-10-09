@@ -1,9 +1,13 @@
-'use client'
+"use client"
 
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const [stats, setStats] = useState<{ totalApplications: number; cvFilesCount: number; pendingRankings: number; activeVacancies: number } | null>(null)
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
 
   const handleLogout = async () => {
     try {
@@ -17,21 +21,39 @@ export default function AdminDashboard() {
     }
   }
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true)
+        const res = await fetch('/api/admin/stats', { credentials: 'include' })
+        const data = await res.json()
+        if (!res.ok) {
+          setStatsError(data.error || 'Failed to load stats')
+          return
+        }
+        setStats(data)
+      } catch (err) {
+        setStatsError('Network error')
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">CV Submission Admin</h1>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition-colors"
-        >
-          Logout
-        </button>
+    <div className="admin-container">
+      <div className="admin-row space-between" style={{ alignItems: 'center' }}>
+        <h1 className="page-title">CV Submission Admin</h1>
+        <div className="admin-actions">
+          <button onClick={handleLogout} className="btn btn-muted">Logout</button>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         {/* Blob Storage Browser */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+  <div className="admin-card">
           <div className="flex items-center mb-4">
             <div className="bg-blue-100 rounded-full p-3">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,18 +61,13 @@ export default function AdminDashboard() {
               </svg>
             </div>
           </div>
-          <h3 className="text-xl font-semibold mb-2">Blob Storage</h3>
-          <p className="text-gray-600 mb-4">Browse and manage uploaded CV files</p>
-          <a 
-            href="/admin/blobs" 
-            className="inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors"
-          >
-            Browse Files
-          </a>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>Blob Storage</h3>
+          <p className="muted" style={{ marginBottom: '0.75rem' }}>Browse and manage uploaded CV files</p>
+          <a href="/admin/blobs" className="btn btn-primary">Browse Files</a>
         </div>
 
         {/* Applications Management */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+  <div className="admin-card">
           <div className="flex items-center mb-4">
             <div className="bg-green-100 rounded-full p-3">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,18 +75,13 @@ export default function AdminDashboard() {
               </svg>
             </div>
           </div>
-          <h3 className="text-xl font-semibold mb-2">Applications</h3>
-          <p className="text-gray-600 mb-4">View and manage CV applications</p>
-          <a 
-            href="/admin/applications" 
-            className="inline-block bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors"
-          >
-            View Applications
-          </a>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>Applications</h3>
+          <p className="muted" style={{ marginBottom: '0.75rem' }}>View and manage CV applications</p>
+          <a href="/admin/applications" className="btn btn-primary">View Applications</a>
         </div>
 
         {/* Database Browser */}
-        <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+  <div className="admin-card">
           <div className="flex items-center mb-4">
             <div className="bg-purple-100 rounded-full p-3">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,44 +89,38 @@ export default function AdminDashboard() {
               </svg>
             </div>
           </div>
-          <h3 className="text-xl font-semibold mb-2">Database</h3>
-          <p className="text-gray-600 mb-4">Browse database with Prisma Studio</p>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>Database</h3>
+          <p className="muted" style={{ marginBottom: '0.75rem' }}>Browse database with Prisma Studio</p>
           <div className="space-y-2">
             <div className="text-sm text-gray-500">
               Run: <code className="bg-gray-100 px-1 rounded">npx prisma studio</code>
             </div>
-            <a 
-              href="http://localhost:5555" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded transition-colors"
-            >
-              Open Prisma Studio
-            </a>
+            <a href="http://localhost:5555" target="_blank" rel="noopener noreferrer" className="btn btn-primary">Open Prisma Studio</a>
           </div>
         </div>
       </div>
 
-      <div className="mt-12">
+  <div className="mt-12">
         <h2 className="text-2xl font-bold mb-4">Quick Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">-</div>
-            <div className="text-sm text-blue-600">Total Applications</div>
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+          <div className="stat-card stat-blue">
+            <div className="stat-number">{loadingStats ? '…' : stats ? stats.totalApplications : '-'}</div>
+            <div className="stat-label">Total Applications</div>
           </div>
-          <div className="bg-green-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">-</div>
-            <div className="text-sm text-green-600">CV Files</div>
+          <div className="stat-card stat-green">
+            <div className="stat-number">{loadingStats ? '…' : stats ? stats.cvFilesCount : '-'}</div>
+            <div className="stat-label">CV Files</div>
           </div>
-          <div className="bg-yellow-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">-</div>
-            <div className="text-sm text-yellow-600">Pending Rankings</div>
+          <div className="stat-card stat-yellow">
+            <div className="stat-number">{loadingStats ? '…' : stats ? stats.pendingRankings : '-'}</div>
+            <div className="stat-label">Pending Rankings</div>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">-</div>
-            <div className="text-sm text-purple-600">Active Vacancies</div>
+          <div className="stat-card stat-purple">
+            <div className="stat-number">{loadingStats ? '…' : stats ? stats.activeVacancies : '-'}</div>
+            <div className="stat-label">Active Vacancies</div>
           </div>
         </div>
+        {statsError && <div className="mt-2 text-red-600">Error loading stats: {statsError}</div>}
       </div>
     </div>
   )

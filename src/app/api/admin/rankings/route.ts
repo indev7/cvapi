@@ -3,7 +3,6 @@ import { requireAdminAuth } from '@/lib/admin-auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
-  // Check authentication
   const authError = await requireAdminAuth()
   if (authError) return authError
 
@@ -12,14 +11,11 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '100')
 
-    const where = { cv_file_url: { not: null } }
-
-    const [total, applications] = await Promise.all([
-      prisma.application.count({ where }),
-      prisma.application.findMany({
-        where,
-        include: { vacancy: true },
-        orderBy: { created_at: 'desc' },
+    const [total, rankings] = await Promise.all([
+      prisma.cvRanking.count(),
+      prisma.cvRanking.findMany({
+        include: { application: true },
+        orderBy: { ranked_at: 'desc' },
         skip: (page - 1) * limit,
         take: limit
       })
@@ -27,12 +23,9 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.max(1, Math.ceil(total / limit))
 
-    return NextResponse.json({
-      applications,
-      pagination: { page, limit, total, totalPages }
-    })
+    return NextResponse.json({ rankings, pagination: { page, limit, total, totalPages } })
   } catch (error) {
-    console.error('Error fetching CV files from DB:', error)
-    return NextResponse.json({ error: 'Failed to fetch CV files' }, { status: 500 })
+    console.error('Error fetching rankings:', error)
+    return NextResponse.json({ error: 'Failed to fetch rankings' }, { status: 500 })
   }
 }
