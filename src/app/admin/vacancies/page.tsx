@@ -56,25 +56,38 @@ export default function AdminVacanciesPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Title</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applications</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">JD</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number of Applications</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Closing Date</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {vacancies.map(v => (
-                <tr key={v.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.job_title}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.status}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.applicationCount ?? '—'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.pendingCount ?? '—'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.created_at ? new Date(v.created_at).toLocaleString() : '—'}</td>
-                </tr>
-              ))}
+              {vacancies.map(v => {
+                // Compute closing date: if the model does not include a closing date field,
+                // assume default window of 30 days from created_at. This is a reasonable
+                // calculated fallback; if you have a dedicated closing_date field we can
+                // switch to that later.
+                let closing = '—'
+                if (v.created_at) {
+                  try {
+                    const d = new Date(v.created_at)
+                    d.setDate(d.getDate() + 30)
+                    closing = d.toLocaleDateString()
+                  } catch (e) {
+                    closing = '—'
+                  }
+                }
+
+                return (
+                  <tr key={v.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.job_title}</td>
+                    <td className="px-6 py-4 whitespace-normal text-sm text-gray-700">{v.description || '—'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.applicationCount ?? '—'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{closing}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

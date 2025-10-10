@@ -22,12 +22,34 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const job_title = searchParams.get('job_title')
     const status = searchParams.get('status')
+    const email = searchParams.get('email')
+    const phone = searchParams.get('phone')
+    const submitted_from = searchParams.get('submitted_from')
+    const submitted_to = searchParams.get('submitted_to')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     
-    const where = {
+    // Build prisma where filters. Keep flexible to allow combining filters.
+    const where: any = {
       ...(job_title && { job_title }),
       ...(status && { status })
+    }
+
+    if (email) {
+      where.email = { contains: email, mode: 'insensitive' }
+    }
+    if (phone) {
+      where.phone = { contains: phone }
+    }
+    if (submitted_from || submitted_to) {
+      where.created_at = {}
+      if (submitted_from) where.created_at.gte = new Date(submitted_from)
+      if (submitted_to) {
+        // include entire day for submitted_to
+        const toDate = new Date(submitted_to)
+        toDate.setHours(23,59,59,999)
+        where.created_at.lte = toDate
+      }
     }
     
     const [applications, total] = await Promise.all([

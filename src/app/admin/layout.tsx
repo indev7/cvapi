@@ -14,12 +14,8 @@ export default function AdminLayout({
             <div className="text-sm muted">CV Submission</div>
           </div>
           <nav>
-            <Link href="/admin" className="admin-nav-link">Dashboard</Link>
-            <Link href="/admin/blobs" className="admin-nav-link">CV Files</Link>
             <Link href="/admin/applications" className="admin-nav-link">Applications</Link>
             <Link href="/admin/vacancies" className="admin-nav-link">Vacancies</Link>
-            <Link href="/admin/rankings" className="admin-nav-link">Rankings</Link>
-            <Link href="/admin/login" className="admin-nav-link">Logout</Link>
           </nav>
         </aside>
 

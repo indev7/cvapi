@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
 interface Vacancy {
   id: number
@@ -24,11 +25,18 @@ export default function AdminApplicationsPage() {
   const [limit] = useState<number>(100)
   const [totalPages, setTotalPages] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchJobTitle, setSearchJobTitle] = useState<string>('')
+  const [searchEmail, setSearchEmail] = useState<string>('')
+  const [searchPhone, setSearchPhone] = useState<string>('')
+  const [searchFrom, setSearchFrom] = useState<string>('')
+  const [searchTo, setSearchTo] = useState<string>('')
 
-  const fetchApplications = useCallback(async (p = 1) => {
+  const fetchApplications = useCallback(async (p = 1, params: Record<string,string> = {}) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/applications?page=${p}&limit=${limit}`, { credentials: 'include' })
+      const qs = new URLSearchParams({ page: String(p), limit: String(limit), ...params })
+      const res = await fetch(`/api/applications?${qs.toString()}`, { credentials: 'include' })
       const data = await res.json()
       setApplications(data.applications || [])
       if (data.pagination) setTotalPages(data.pagination.totalPages)
@@ -47,7 +55,8 @@ export default function AdminApplicationsPage() {
     <div className="admin-container">
       <div className="admin-row" style={{ marginBottom: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Applications ({applications.length})</h1>
-        <div className="admin-actions">
+        <div className="admin-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button onClick={() => setShowSearch(true)} className="btn btn-muted">Search</button>
           <div className="muted">Page {page}{totalPages ? ` / ${totalPages}` : ''}</div>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn btn-muted">Prev</button>
           <button onClick={() => setPage(p => (totalPages ? Math.min(totalPages, p + 1) : p + 1))} className="btn btn-muted">Next</button>
@@ -66,24 +75,24 @@ export default function AdminApplicationsPage() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Job</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Status</th>
-                  <th>CV</th>
-                  <th>Created</th>
+                  <th>Applicant Email</th>
+                  <th>Applicant Phone</th>
+                  <th>Job Title</th>
+                  <th>Submitted Date</th>
+                  <th>View CV</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.map(app => (
                   <tr key={app.id}>
-                    <td>{app.id}</td>
-                    <td>{app.vacancy?.job_title || app.job_title}</td>
+                    <td>
+                      <Link href={`/admin/rankings/${app.id}`} className="admin-link">{app.id}</Link>
+                    </td>
                     <td>{app.email || '\u2014'}</td>
                     <td>{app.phone || '\u2014'}</td>
-                    <td>{app.status}</td>
-                    <td>{app.cv_file_url ? (<a href={app.cv_file_url} target="_blank" rel="noreferrer">View</a>) : '\u2014'}</td>
+                    <td>{app.vacancy?.job_title || app.job_title}</td>
                     <td>{new Date(app.created_at).toLocaleString()}</td>
+                    <td>{app.cv_file_url ? (<a href={app.cv_file_url} target="_blank" rel="noreferrer">View</a>) : '\u2014'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -91,6 +100,48 @@ export default function AdminApplicationsPage() {
           </div>
         )}
       </div>
+
+      {/* Search Modal */}
+      {showSearch && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">Search Applications</h2>
+            <div className="modal-body">
+              <label className="label">Job Title</label>
+              <input value={searchJobTitle} onChange={e => setSearchJobTitle(e.target.value)} className="input" />
+
+              <label className="label">Submitted From</label>
+              <input type="date" value={searchFrom} onChange={e => setSearchFrom(e.target.value)} className="input" />
+
+              <label className="label">Submitted To</label>
+              <input type="date" value={searchTo} onChange={e => setSearchTo(e.target.value)} className="input" />
+
+              <label className="label">Applicant Email</label>
+              <input value={searchEmail} onChange={e => setSearchEmail(e.target.value)} className="input" />
+
+              <label className="label">Applicant Phone</label>
+              <input value={searchPhone} onChange={e => setSearchPhone(e.target.value)} className="input" />
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-muted" onClick={() => setShowSearch(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={async () => {
+                // Build params
+                const params: Record<string,string> = {}
+                if (searchJobTitle) params.job_title = searchJobTitle
+                if (searchEmail) params.email = searchEmail
+                if (searchPhone) params.phone = searchPhone
+                if (searchFrom) params.submitted_from = searchFrom
+                if (searchTo) params.submitted_to = searchTo
+                // fetch first page with params
+                await fetchApplications(1, params)
+                setPage(1)
+                setShowSearch(false)
+              }}>Search</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
