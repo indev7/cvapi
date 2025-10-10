@@ -30,7 +30,10 @@ export default function AdminApplicationsPage() {
   const [searchEmail, setSearchEmail] = useState<string>('')
   const [searchPhone, setSearchPhone] = useState<string>('')
   const [searchFrom, setSearchFrom] = useState<string>('')
-  const [searchTo, setSearchTo] = useState<string>('')
+  const [searchDate, setSearchDate] = useState<string>('')
+  const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [vacanciesLoading, setVacanciesLoading] = useState(false)
+  const [vacanciesError, setVacanciesError] = useState<string | null>(null)
 
   const fetchApplications = useCallback(async (p = 1, params: Record<string,string> = {}) => {
     setLoading(true)
@@ -50,6 +53,30 @@ export default function AdminApplicationsPage() {
   useEffect(() => {
     fetchApplications(page)
   }, [page, fetchApplications])
+
+  // Fetch vacancies when search modal is opened
+  useEffect(() => {
+    if (!showSearch) return
+    let mounted = true
+    ;(async () => {
+      try {
+        setVacanciesLoading(true)
+        setVacanciesError(null)
+        const res = await fetch('/api/public/vacancies')
+        if (!res.ok) throw new Error('Failed to fetch vacancies')
+        const data = await res.json()
+        // public endpoint returns array of { Job_Title, URL }
+        const mapped: Vacancy[] = data.map((v: any, i: number) => ({ id: i, job_title: v.Job_Title }))
+        if (mounted) setVacancies(mapped)
+      } catch (err: any) {
+        console.error('Vacancies fetch error', err)
+        if (mounted) setVacanciesError(err?.message || 'Failed to load')
+      } finally {
+        if (mounted) setVacanciesLoading(false)
+      }
+    })()
+    return () => { mounted = false }
+  }, [showSearch])
 
   return (
     <div className="admin-container">
@@ -108,13 +135,21 @@ export default function AdminApplicationsPage() {
             <h2 className="modal-title">Search Applications</h2>
             <div className="modal-body">
               <label className="label">Job Title</label>
-              <input value={searchJobTitle} onChange={e => setSearchJobTitle(e.target.value)} className="input" />
+              {vacanciesLoading ? (
+                <div className="muted">Loading job titles...</div>
+              ) : vacanciesError ? (
+                <div className="muted">Failed to load job titles</div>
+              ) : (
+                <select value={searchJobTitle} onChange={e => setSearchJobTitle(e.target.value)} className="input">
+                  <option value="">-- Any --</option>
+                  {vacancies.map(v => (
+                    <option key={v.id} value={v.job_title || ''}>{v.job_title}</option>
+                  ))}
+                </select>
+              )}
 
-              <label className="label">Submitted From</label>
-              <input type="date" value={searchFrom} onChange={e => setSearchFrom(e.target.value)} className="input" />
-
-              <label className="label">Submitted To</label>
-              <input type="date" value={searchTo} onChange={e => setSearchTo(e.target.value)} className="input" />
+              <label className="label">Submitted Date</label>
+              <input type="date" value={searchDate} onChange={e => setSearchDate(e.target.value)} className="input" />
 
               <label className="label">Applicant Email</label>
               <input value={searchEmail} onChange={e => setSearchEmail(e.target.value)} className="input" />
@@ -131,8 +166,7 @@ export default function AdminApplicationsPage() {
                 if (searchJobTitle) params.job_title = searchJobTitle
                 if (searchEmail) params.email = searchEmail
                 if (searchPhone) params.phone = searchPhone
-                if (searchFrom) params.submitted_from = searchFrom
-                if (searchTo) params.submitted_to = searchTo
+                if (searchDate) params.submitted_date = searchDate
                 // fetch first page with params
                 await fetchApplications(1, params)
                 setPage(1)

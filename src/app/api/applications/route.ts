@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const email = searchParams.get('email')
     const phone = searchParams.get('phone')
-    const submitted_from = searchParams.get('submitted_from')
-    const submitted_to = searchParams.get('submitted_to')
+  const submitted_from = searchParams.get('submitted_from')
+  const submitted_to = searchParams.get('submitted_to')
+  const submitted_date = searchParams.get('submitted_date')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     
@@ -41,7 +42,14 @@ export async function GET(request: NextRequest) {
     if (phone) {
       where.phone = { contains: phone }
     }
-    if (submitted_from || submitted_to) {
+    // Support single-day filter via submitted_date (takes precedence).
+    if (submitted_date) {
+      const dayStart = new Date(submitted_date)
+      dayStart.setHours(0,0,0,0)
+      const dayEnd = new Date(submitted_date)
+      dayEnd.setHours(23,59,59,999)
+      where.created_at = { gte: dayStart, lte: dayEnd }
+    } else if (submitted_from || submitted_to) {
       where.created_at = {}
       if (submitted_from) where.created_at.gte = new Date(submitted_from)
       if (submitted_to) {
