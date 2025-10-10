@@ -80,6 +80,39 @@ function parseFloatSafe(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Parse and return null when source is empty/undefined/null; return numeric value (including 0) when present
+function parseIntMaybe(v) {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  const n = parseInt(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseFloatMaybe(v) {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Get a cell from a row by trying several header variants
+function getCell(row, name) {
+  if (!row || !name) return null;
+  const variants = [];
+  // common forms
+  variants.push(name);
+  variants.push(name.replace(/ /g, '_'));
+  variants.push(name.replace(/ /g, '').toLowerCase());
+  variants.push(name.toLowerCase());
+  variants.push(name.replace(/ /g, '').replace(/_/g, '').toLowerCase());
+  // also push exact lower/upper
+  variants.push(name.toUpperCase());
+  variants.push(name.charAt(0).toUpperCase() + name.slice(1));
+
+  for (const v of variants) {
+    if (Object.prototype.hasOwnProperty.call(row, v)) return row[v];
+  }
+  return null;
+}
+
 function normalizePhone(raw) {
   if (raw === null || raw === undefined) return null;
   let s = String(raw).trim();
@@ -100,76 +133,144 @@ function normalizePhone(raw) {
 async function migrate() {
   const sheets = await readSheets();
   const summary = {};
+  const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
+  const RANKINGS_ONLY = process.env.RANKINGS_ONLY === '1' || process.env.RANKINGS_ONLY === 'true';
+  // When true, allow an explicit 0 from the source to overwrite a 0 in DB as well.
+  const ALLOW_ZERO_OVERWRITE = process.env.ALLOW_ZERO_OVERWRITE === '1' || process.env.ALLOW_ZERO_OVERWRITE === 'true';
+
+  // Build a mapping of job_title -> url from any JD/vacancy-like sheets so we can use
+  // the canonical URL when filling vacancies or linking applications.
+  const jdUrlMap = {};
+  for (const [sheetName, rows] of Object.entries(sheets)) {
+    const key = sheetName.toLowerCase();
+    if (key.includes('vacancy') || key.includes('vacancies') || key.includes('jobs') || key.includes('jd')) {
+      for (const row of rows) {
+        const title = row.Job_Title || row.job_title || row['Job Title'] || row.job_title_text || null;
+        const url = row.URL || row.url || null;
+        if (title && url) jdUrlMap[title] = url;
+      }
+    }
+  }
 
   // Helper: migrate vacancies
   async function migrateVacancies(rows) {
-    let created = 0;
+    let created = 0, updated = 0;
     for (const row of rows) {
       const title = row.Job_Title || row.job_title || row['Job Title'] || row.job_title_text || null;
       if (!title) continue;
       try {
+        const url = row.URL || row.url || null;
+        const description = row.Description || row.description || null;
+        const status = row.Status || 'active';
+
         const existing = await prisma.vacancy.findFirst({ where: { job_title: title } });
-        if (existing) continue;
-        await prisma.vacancy.create({ data: {
-          job_title: title,
-          url: row.URL || row.url || null,
-          description: row.Description || row.description || null,
-          status: row.Status || 'active'
-        }});
+        if (existing) {
+          const update = {};
+          // Only update when DB value is empty/null
+          // Prefer the JD sheet mapping if available
+          const mappedUrl = jdUrlMap[title];
+          if ((!existing.url || existing.url === '') && (url || mappedUrl)) update.url = url || mappedUrl;
+          if ((!existing.description || existing.description === '') && description) update.description = description;
+          if ((!existing.status || existing.status === '') && status) update.status = status;
+          if (Object.keys(update).length > 0) {
+            if (DRY_RUN) console.log('DRY RUN: would update vacancy', existing.id, update);
+            else await prisma.vacancy.update({ where: { id: existing.id }, data: update });
+            updated++;
+          }
+          continue;
+        }
+
+        const createData = { job_title: title, url: url || jdUrlMap[title] || null, description, status };
+        if (DRY_RUN) console.log('DRY RUN: would create vacancy', createData);
+        else await prisma.vacancy.create({ data: createData });
         created++;
       } catch (e) {
         console.error('Vacancy row error:', e, row);
       }
     }
-    return { created };
+    return { created, updated };
   }
 
   // Helper: migrate applications
   async function migrateApplications(rows) {
-    let created = 0, skipped = 0;
+    let created = 0, updated = 0, skipped = 0;
     for (const raw of rows) {
       const r = normalizeRow(raw);
       if (!r.job_title && !r.email) continue;
       try {
-        // If ID provided and exists, skip (insert-only semantics)
-        if (r.id) {
-          const existing = await prisma.application.findUnique({ where: { id: r.id } });
-          if (existing) {
-            skipped++;
-            continue;
-          }
+        // Find existing by id if provided
+        let existing = null;
+        if (r.id) existing = await prisma.application.findUnique({ where: { id: r.id } });
+
+        // If no id, try to find by email+job_title
+        if (!existing && r.email && r.job_title) {
+          existing = await prisma.application.findFirst({ where: { email: r.email, job_title: r.job_title } });
         }
 
-        // If no ID, try to avoid duplicates by email + job_title
-        if (!r.id && r.email && r.job_title) {
-          const dup = await prisma.application.findFirst({ where: { email: r.email, job_title: r.job_title } });
-          if (dup) {
-            skipped++;
-            continue;
+        // Find vacancy for this job_title if present
+        let vacancy = null;
+        if (r.job_title) {
+          vacancy = await prisma.vacancy.findFirst({ where: { job_title: r.job_title } });
+        }
+
+        if (existing) {
+          // Build update object only for missing/empty fields
+          const update = {};
+          if ((!existing.email || existing.email === '') && r.email) update.email = r.email;
+          const normPhone = normalizePhone(r.phone);
+          if ((!existing.phone || existing.phone === '') && normPhone) update.phone = normPhone;
+          if ((!existing.job_title || existing.job_title === '') && r.job_title) update.job_title = r.job_title;
+          if ((!existing.cv_file_url || existing.cv_file_url === '') && r.cv_file_url) update.cv_file_url = r.cv_file_url;
+          if ((!existing.source || existing.source === '') && r.source) update.source = r.source;
+          if ((!existing.status || existing.status === '') && r.status) update.status = r.status;
+          if ((!existing.vacancy_id || existing.vacancy_id === null) && vacancy) update.vacancy_id = vacancy.id;
+
+          // If vacancy exists but missing URL, fill it from JD mapping when available
+          if (vacancy && (!vacancy.url || vacancy.url === '') && jdUrlMap[r.job_title]) {
+            if (!update.vacancy_id) update.vacancy_id = vacancy.id;
+            if (DRY_RUN) console.log('DRY RUN: would update vacancy URL for', vacancy.id, jdUrlMap[r.job_title]);
+            else {
+              try { await prisma.vacancy.update({ where: { id: vacancy.id }, data: { url: jdUrlMap[r.job_title] } }); }
+              catch (e) { console.error('Failed to update vacancy URL:', e); }
+            }
           }
+
+          if (Object.keys(update).length > 0) {
+            if (DRY_RUN) console.log('DRY RUN: would update application', existing.id, update);
+            else await prisma.application.update({ where: { id: existing.id }, data: update });
+            updated++;
+          } else {
+            skipped++;
+          }
+          continue;
         }
 
         // Create new application. If no id provided, let DB generate UUID.
-        await prisma.application.create({ data: {
+        const appData = {
           id: r.id || undefined,
           email: r.email,
           phone: normalizePhone(r.phone),
           job_title: r.job_title || 'Unknown',
+          vacancy_id: vacancy ? vacancy.id : undefined,
           cv_file_url: r.cv_file_url,
           source: r.source || 'manual',
           status: r.status || 'pending'
-        }});
+        };
+        if (DRY_RUN) console.log('DRY RUN: would create application', appData);
+        else await prisma.application.create({ data: appData });
         created++;
       } catch (e) {
         console.error('Application row error:', e, raw);
       }
     }
-    return { created, skipped };
+    return { created, updated, skipped };
   }
 
   // Helper: migrate rankings
   async function migrateRankings(rows) {
-    let created = 0, skipped = 0;
+    let created = 0, updated = 0, skipped = 0;
+    const DEBUG_LIMIT = parseInt(process.env.DEBUG_LIMIT || '5');
+    let debugCount = 0;
     for (const row of rows) {
       const application_id = row.Application_ID || row.application_id || row.ID || row.Id || null;
       if (!application_id) continue;
@@ -179,38 +280,93 @@ async function migrate() {
           skipped++;
           continue;
         }
-        // Skip if a ranking for this application already exists
+
         const existingRanking = await prisma.cvRanking.findFirst({ where: { application_id } });
+
+        const parsed = {
+          education_score: parseIntMaybe(getCell(row, 'Education Score')),
+          education_evidence: getCell(row, 'Education Evidence') || getCell(row, 'Education_Evidence') || null,
+          work_experience_score: parseIntMaybe(getCell(row, 'Work Experience Score')),
+          work_experience_evidence: getCell(row, 'Work Experience Evidence') || null,
+          skill_match_score: parseIntMaybe(getCell(row, 'Skill Set Match Score') || getCell(row, 'Skill Match Score') || getCell(row, 'Skill Set Score')),
+          skill_match_evidence: getCell(row, 'Skill Set Match Evidence') || null,
+          certifications_score: parseIntMaybe(getCell(row, 'Certifications Score')),
+          certifications_evidence: getCell(row, 'Certifications Evidence') || null,
+          domain_knowledge_score: parseIntMaybe(getCell(row, 'Domain Knowledge Score')),
+          domain_knowledge_evidence: getCell(row, 'Domain Knowledge Evidence') || null,
+          soft_skills_score: parseIntMaybe(getCell(row, 'Soft Skills Score')),
+          soft_skills_evidence: getCell(row, 'Soft Skills Evidence') || null,
+          total_score: parseIntMaybe(getCell(row, 'Total Score')),
+          final_score: parseFloatMaybe(getCell(row, 'Final Score')),
+          summary: getCell(row, 'Summary') || null
+        };
+
         if (existingRanking) {
-          skipped++;
+          if (DRY_RUN && debugCount < DEBUG_LIMIT) {
+            console.log('DRY RUN DIAG: application_id=', application_id);
+            console.log('  raw row keys:', Object.keys(row).slice(0,50));
+            console.log('  parsed sample:', {
+              education_score: parsed.education_score,
+              work_experience_score: parsed.work_experience_score,
+              skill_match_score: parsed.skill_match_score,
+              total_score: parsed.total_score,
+              final_score: parsed.final_score
+            });
+            console.log('  existingRanking sample:', {
+              education_score: existingRanking.education_score,
+              work_experience_score: existingRanking.work_experience_score,
+              skill_match_score: existingRanking.skill_match_score,
+              total_score: existingRanking.total_score,
+              final_score: existingRanking.final_score
+            });
+            debugCount++;
+          }
+          const update = {};
+          // For numeric scores, update if DB has 0 and source has > 0
+          const scoreKeys = [
+            'education_score','work_experience_score','skill_match_score','certifications_score','domain_knowledge_score','soft_skills_score','total_score'
+          ];
+          for (const k of scoreKeys) {
+            // Update when DB is null or 0 AND source has a defined numeric value (including 0)
+            if ((existingRanking[k] === null || existingRanking[k] === 0) && parsed[k] !== null) {
+              // If source numeric is 0 and DB is 0, only overwrite when ALLOW_ZERO_OVERWRITE=true or DB is null
+              if (parsed[k] === 0 && existingRanking[k] === 0 && !ALLOW_ZERO_OVERWRITE && existingRanking[k] !== null) {
+                // don't overwrite a 0 with 0 unless allowed
+              } else {
+                update[k] = parsed[k];
+              }
+            }
+          }
+          if ((existingRanking.final_score === null || Number(existingRanking.final_score) === 0) && parsed.final_score !== null) {
+            if (!(Number(parsed.final_score) === 0 && Number(existingRanking.final_score) === 0 && !ALLOW_ZERO_OVERWRITE && existingRanking.final_score !== null)) {
+              update.final_score = parsed.final_score;
+            }
+          }
+          // For evidence and summary strings, update when empty/null
+          const textKeys = ['education_evidence','work_experience_evidence','skill_match_evidence','certifications_evidence','domain_knowledge_evidence','soft_skills_evidence','summary'];
+          for (const k of textKeys) {
+            if ((!existingRanking[k] || existingRanking[k] === '') && parsed[k]) update[k] = parsed[k];
+          }
+
+          if (Object.keys(update).length > 0) {
+            if (DRY_RUN) console.log('DRY RUN: would update ranking', existingRanking.id, update);
+            else await prisma.cvRanking.update({ where: { id: existingRanking.id }, data: update });
+            updated++;
+          } else {
+            skipped++;
+          }
           continue;
         }
-        // Build ranking object
-        const ranking = {
-          application_id: application_id,
-          education_score: parseIntSafe(row.Education_Score || row.education_score),
-          education_evidence: row.Education_Evidence || row.education_evidence || null,
-          work_experience_score: parseIntSafe(row.Work_Experience_Score || row.work_experience_score),
-          work_experience_evidence: row.Work_Experience_Evidence || row.work_experience_evidence || null,
-          skill_match_score: parseIntSafe(row.Skill_Match_Score || row.skill_match_score),
-          skill_match_evidence: row.Skill_Match_Evidence || row.skill_match_evidence || null,
-          certifications_score: parseIntSafe(row.Certifications_Score || row.certifications_score),
-          certifications_evidence: row.Certifications_Evidence || row.certifications_evidence || null,
-          domain_knowledge_score: parseIntSafe(row.Domain_Knowledge_Score || row.domain_knowledge_score),
-          domain_knowledge_evidence: row.Domain_Knowledge_Evidence || row.domain_knowledge_evidence || null,
-          soft_skills_score: parseIntSafe(row.Soft_Skills_Score || row.soft_skills_score),
-          soft_skills_evidence: row.Soft_Skills_Evidence || row.soft_skills_evidence || null,
-          total_score: parseIntSafe(row.Total_Score || row.total_score),
-          final_score: parseFloatSafe(row.Final_Score || row.final_score),
-          summary: row.Summary || row.summary || null
-        };
-        await prisma.cvRanking.create({ data: ranking });
+
+        const ranking = Object.assign({ application_id }, parsed);
+        if (DRY_RUN) console.log('DRY RUN: would create ranking', ranking);
+        else await prisma.cvRanking.create({ data: ranking });
         created++;
       } catch (e) {
         console.error('Ranking row error:', e, row);
       }
     }
-    return { created, skipped };
+    return { created, updated, skipped };
   }
 
   // Helper: migrate referrals
@@ -245,17 +401,27 @@ async function migrate() {
   for (const [sheetName, rows] of Object.entries(sheets)) {
     console.log(`\nProcessing sheet: ${sheetName} (${rows.length} rows)`);
     const key = sheetName.toLowerCase();
-    if (key.includes('vacancy') || key.includes('vacancies') || key.includes('jobs') || key.includes('jd')) {
-      summary[sheetName] = await migrateVacancies(rows);
-    } else if (key.includes('application') || key.includes('applications') || key.includes('applicants')) {
-      summary[sheetName] = await migrateApplications(rows);
-    } else if (key.includes('rank') || key.includes('ranking') || key.includes('cv_rankings') || key.includes('ranks')) {
-      summary[sheetName] = await migrateRankings(rows);
-    } else if (key.includes('referral') || key.includes('referrals')) {
-      summary[sheetName] = await migrateReferrals(rows);
+    if (RANKINGS_ONLY) {
+      // If user only wants rankings, skip other sheets
+      if (key.includes('rank') || key.includes('ranking') || key.includes('cv_rankings') || key.includes('ranks')) {
+        summary[sheetName] = await migrateRankings(rows);
+      } else {
+        console.log('  Skipping non-ranking sheet due to RANKINGS_ONLY');
+        summary[sheetName] = { created: 0, updated: 0, skipped: 0 };
+      }
     } else {
-      console.log('  Unknown sheet name — attempting to treat as applications by default');
-      summary[sheetName] = await migrateApplications(rows);
+      if (key.includes('vacancy') || key.includes('vacancies') || key.includes('jobs') || key.includes('jd')) {
+        summary[sheetName] = await migrateVacancies(rows);
+      } else if (key.includes('application') || key.includes('applications') || key.includes('applicants')) {
+        summary[sheetName] = await migrateApplications(rows);
+      } else if (key.includes('rank') || key.includes('ranking') || key.includes('cv_rankings') || key.includes('ranks')) {
+        summary[sheetName] = await migrateRankings(rows);
+      } else if (key.includes('referral') || key.includes('referrals')) {
+        summary[sheetName] = await migrateReferrals(rows);
+      } else {
+        console.log('  Unknown sheet name — attempting to treat as applications by default');
+        summary[sheetName] = await migrateApplications(rows);
+      }
     }
   }
 
