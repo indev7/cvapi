@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma'
 
 export default async function RankingDetailPage({ params }: any) {
-  const { applicationId } = params
+  // `params` can be a promise in some Next.js runtime cases; await it before using.
+  const { applicationId } = await params
 
   // Fetch ranking and related application
   const ranking = await prisma.cvRanking.findUnique({

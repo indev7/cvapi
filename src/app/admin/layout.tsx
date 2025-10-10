@@ -10,7 +10,7 @@ export default function AdminLayout({
       <div className="admin-layout-flex">
         <aside className="admin-sidebar">
           <div className="mb-6">
-            <h2 className="text-lg font-bold">Admin</h2>
+            <h2 className="text-lg font-bold"><Link href="/admin">Admin</Link></h2>
             <div className="text-sm muted">CV Submission</div>
           </div>
           <nav>
