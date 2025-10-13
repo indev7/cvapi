@@ -24,6 +24,7 @@ export default function AdminApplicationsPage() {
   const [page, setPage] = useState<number>(1)
   const [limit] = useState<number>(100)
   const [totalPages, setTotalPages] = useState<number | null>(null)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchJobTitle, setSearchJobTitle] = useState<string>('')
@@ -42,7 +43,10 @@ export default function AdminApplicationsPage() {
       const res = await fetch(`/api/applications?${qs.toString()}`, { credentials: 'include' })
       const data = await res.json()
       setApplications(data.applications || [])
-      if (data.pagination) setTotalPages(data.pagination.totalPages)
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages)
+        setTotalCount(data.pagination.total || null)
+      }
     } catch (err) {
       console.error('Failed to fetch applications', err)
     } finally {
@@ -81,9 +85,14 @@ export default function AdminApplicationsPage() {
   return (
     <div className="admin-container">
       <div className="admin-row" style={{ marginBottom: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 className="page-title">Applications ({applications.length})</h1>
+  <h1 className="page-title">Intervest Job Applications ({totalCount ?? applications.length})</h1>
         <div className="admin-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button onClick={() => setShowSearch(true)} className="btn btn-muted">Search</button>
+          <button onClick={() => setShowSearch(true)} className="btn btn-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ marginRight: 6 }}>
+              <path stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+            </svg>
+            Search
+          </button>
           <div className="muted">Page {page}{totalPages ? ` / ${totalPages}` : ''}</div>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn btn-muted">Prev</button>
           <button onClick={() => setPage(p => (totalPages ? Math.min(totalPages, p + 1) : p + 1))} className="btn btn-muted">Next</button>
@@ -171,7 +180,12 @@ export default function AdminApplicationsPage() {
                 await fetchApplications(1, params)
                 setPage(1)
                 setShowSearch(false)
-              }}>Search</button>
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ marginRight: 6 }}>
+                  <path stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+                </svg>
+                Search
+              </button>
             </div>
           </div>
         </div>

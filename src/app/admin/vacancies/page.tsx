@@ -39,59 +39,60 @@ export default function AdminVacanciesPage() {
     }
   }
 
-  if (loading) return <div className="p-6">Loading vacancies...</div>
-  if (error) return <div className="p-6 text-red-600">Error: {error}</div>
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Vacancies ({vacancies.length})</h1>
-        <button onClick={fetchVacancies} className="btn btn-primary">Refresh</button>
+    <div className="admin-container">
+      <div className="admin-row" style={{ marginBottom: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 className="page-title">Vacancies ({vacancies.length})</h1>
+        <div className="admin-actions">
+          <button onClick={fetchVacancies} className="btn btn-primary">Refresh</button>
+        </div>
       </div>
 
-      {vacancies.length === 0 ? (
-        <div className="card p-6">No vacancies found</div>
-      ) : (
-        <div className="overflow-x-auto card p-4">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Title</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">JD</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number of Applications</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Closing Date</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {vacancies.map(v => {
-                // Compute closing date: if the model does not include a closing date field,
-                // assume default window of 30 days from created_at. This is a reasonable
-                // calculated fallback; if you have a dedicated closing_date field we can
-                // switch to that later.
-                let closing = '—'
-                if (v.created_at) {
-                  try {
-                    const d = new Date(v.created_at)
-                    d.setDate(d.getDate() + 30)
-                    closing = d.toLocaleDateString()
-                  } catch (e) {
-                    closing = '—'
+      <div className="admin-card">
+        {loading ? (
+          <div className="muted">Loading vacancies...</div>
+        ) : error ? (
+          <div className="admin-error">Error: {error}</div>
+        ) : vacancies.length === 0 ? (
+          <div className="muted">No vacancies found</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Job Title</th>
+                  <th>JD</th>
+                  <th>Number of Applications</th>
+                  <th>Closing Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vacancies.map(v => {
+                  let closing = '—'
+                  if (v.created_at) {
+                    try {
+                      const d = new Date(v.created_at)
+                      d.setDate(d.getDate() + 30)
+                      closing = d.toLocaleDateString()
+                    } catch (e) {
+                      closing = '—'
+                    }
                   }
-                }
 
-                return (
-                  <tr key={v.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.job_title}</td>
-                    <td className="px-6 py-4 whitespace-normal text-sm text-gray-700">{v.description || '—'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{v.applicationCount ?? '—'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{closing}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  return (
+                    <tr key={v.id}>
+                      <td>{v.job_title}</td>
+                      <td>{v.url ? (<a href={v.url} target="_blank" rel="noreferrer">{v.url}</a>) : (v.description || '\u2014')}</td>
+                      <td>{v.applicationCount ?? '\u2014'}</td>
+                      <td>{closing}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
