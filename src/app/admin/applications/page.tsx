@@ -66,11 +66,22 @@ export default function AdminApplicationsPage() {
       try {
         setVacanciesLoading(true)
         setVacanciesError(null)
-        const res = await fetch('/api/vacancies')
+        // include credentials so admin endpoints that require auth work
+        const res = await fetch('/api/vacancies', { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to fetch vacancies')
         const data = await res.json()
-        // public endpoint returns array of { Job_Title, URL }
-        const mapped: Vacancy[] = data.map((v: any, i: number) => ({ id: i, job_title: v.Job_Title }))
+        // data may come in multiple shapes:
+        // - admin: array of vacancy objects with id and job_title
+        // - public: array of { Job_Title }
+        let mapped: Vacancy[] = []
+        if (Array.isArray(data)) {
+          mapped = data.map((v: any, i: number) => {
+            if (v.id && v.job_title) return { id: v.id, job_title: v.job_title }
+            if (v.Job_Title) return { id: i, job_title: v.Job_Title }
+            // fallback: try common fields
+            return { id: v.id ?? i, job_title: v.job_title ?? v.Job_Title ?? '' }
+          })
+        }
         if (mounted) setVacancies(mapped)
       } catch (err: any) {
         console.error('Vacancies fetch error', err)
@@ -120,15 +131,15 @@ export default function AdminApplicationsPage() {
               </thead>
               <tbody>
                 {applications.map(app => (
-                  <tr key={app.id}>
+                  <tr key={app.id} style={{ cursor: 'pointer' }} onClick={() => window.location.href = `/admin/rankings/${app.id}`}>
                     <td>
-                      <Link href={`/admin/rankings/${app.id}`} className="admin-link">{app.id}</Link>
+                      <Link href={`/admin/rankings/${app.id}`} className="admin-link" onClick={(e) => e.stopPropagation()}>{app.id}</Link>
                     </td>
                     <td>{app.email || '\u2014'}</td>
                     <td>{app.phone || '\u2014'}</td>
                     <td>{app.vacancy?.job_title || app.job_title}</td>
                     <td>{new Date(app.created_at).toLocaleString()}</td>
-                    <td>{app.cv_file_url ? (<a href={app.cv_file_url} target="_blank" rel="noreferrer">View</a>) : '\u2014'}</td>
+                    <td>{app.cv_file_url ? (<a href={app.cv_file_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>View</a>) : '\u2014'}</td>
                   </tr>
                 ))}
               </tbody>
