@@ -108,6 +108,18 @@ export default function AdminApplicationsPage() {
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn btn-muted">Prev</button>
           <button onClick={() => setPage(p => (totalPages ? Math.min(totalPages, p + 1) : p + 1))} className="btn btn-muted">Next</button>
           <button onClick={() => fetchApplications(page)} className="btn btn-primary">Refresh</button>
+          {(searchJobTitle || searchEmail || searchPhone || searchDate) && (
+            <button onClick={async () => {
+              // clear all filters
+              setSearchJobTitle('')
+              setSearchEmail('')
+              setSearchPhone('')
+              setSearchDate('')
+              // refresh list
+              setPage(1)
+              await fetchApplications(1)
+            }} className="btn btn-muted">Clear filters</button>
+          )}
         </div>
       </div>
 
