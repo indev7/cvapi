@@ -52,3 +52,15 @@ export async function DELETE() {
   response.cookies.delete('admin-auth')
   return response
 }
+
+export async function GET(request: NextRequest) {
+  // Return authentication status based on admin-auth cookie
+  try {
+    const cookie = request.cookies.get('admin-auth')
+    const authenticated = !!cookie && cookie.value === 'authenticated'
+    return NextResponse.json({ authenticated })
+  } catch (err) {
+    console.error('Auth status error', err)
+    return NextResponse.json({ authenticated: false })
+  }
+}

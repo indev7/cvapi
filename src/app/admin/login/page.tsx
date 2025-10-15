@@ -11,7 +11,7 @@ function LoginForm() {
   
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectPath = searchParams.get('redirect') || '/admin'
+  const redirectPath = searchParams.get('redirect') || '/admin/applications'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,9 +30,8 @@ function LoginForm() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        // Redirect to admin dashboard or requested page
-        router.push(redirectPath)
-        router.refresh()
+        // Use full navigation so middleware runs and app reloads with auth cookie set
+        window.location.href = redirectPath
       } else {
         setError(data.error || 'Login failed')
       }

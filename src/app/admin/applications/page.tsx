@@ -66,7 +66,7 @@ export default function AdminApplicationsPage() {
       try {
         setVacanciesLoading(true)
         setVacanciesError(null)
-        const res = await fetch('/api/public/vacancies')
+        const res = await fetch('/api/vacancies')
         if (!res.ok) throw new Error('Failed to fetch vacancies')
         const data = await res.json()
         // public endpoint returns array of { Job_Title, URL }

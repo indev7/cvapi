@@ -4,6 +4,12 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   // Check if accessing admin routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Allow unauthenticated access to login page and assets under /admin/login
+    const publicAllowed = ['/admin/login', '/admin/login/']
+    if (publicAllowed.includes(request.nextUrl.pathname)) {
+      return NextResponse.next()
+    }
+
     // Check for authentication cookie
     const authCookie = request.cookies.get('admin-auth')
     
