@@ -60,8 +60,7 @@ async function handleVacanciesAction() {
       where: { status: 'active' },
       select: {
         job_title: true,
-        url: true,
-        description: true
+        url: true
       },
       orderBy: { created_at: 'desc' }
     })
@@ -69,8 +68,7 @@ async function handleVacanciesAction() {
     // Transform to match Google Apps Script format
     const formattedVacancies = vacancies.map(vacancy => ({
       Job_Title: vacancy.job_title,
-      URL: vacancy.url,
-      Description: vacancy.description
+      URL: vacancy.url
     }))
 
     return addSecurityHeaders(NextResponse.json(formattedVacancies))

@@ -17,32 +17,32 @@ async function main() {
     {
       job_title: 'Software Engineer-Java',
       url: 'https://intervest.lk/careers/post/cG9zdDoyODk=/software-engineer-java',
-      description: 'We are looking for a skilled Java developer with experience in Spring framework, microservices, and REST APIs. The ideal candidate should have strong problem-solving skills and experience with agile development.',
-      status: 'active'
+      status: 'active',
+      closing_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
     },
     {
       job_title: 'Scrum Master',
       url: 'https://intervest.lk/careers/post/cG9zdDoyODA=/scrum-master',
-      description: 'Experienced Scrum Master needed to lead agile development teams. Should have Scrum certification and experience with Jira, Confluence, and agile methodologies.',
-      status: 'active'
+      status: 'active',
+      closing_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45).toISOString()
     },
     {
       job_title: 'Senior Quality Assurance Engineer - Manual',
       url: 'https://intervest.lk/careers/post/cG9zdDoyODM=/senior-quality-assurance-engineer-manual',
-      description: 'Senior QA Engineer with expertise in manual testing, test case design, and defect management. Experience with test management tools and SDLC processes required.',
-      status: 'active'
+      status: 'active',
+      closing_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString()
     },
     {
       job_title: 'Senior Software Engineer-React',
       url: 'https://intervest.lk/careers/post/cG9zdDoyODc=/senior-software-engineer-react',
-      description: 'Senior React developer with expertise in modern JavaScript, TypeScript, Redux, and Next.js. Experience with testing frameworks and CI/CD pipelines preferred.',
-      status: 'active'
+      status: 'active',
+      closing_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
     },
     {
       job_title: 'Senior Data Analyst',
       url: 'https://intervest.lk/careers/post/cG9zdDoyNjM=/senior-data-analyst',
-      description: 'Data analyst with experience in SQL, Python, data visualization tools, and statistical analysis. Should have experience with business intelligence and reporting.',
-      status: 'active'
+      status: 'active',
+      closing_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString()
     }
   ];
 
@@ -91,7 +91,7 @@ async function main() {
       email: 'jane.smith@example.com',
       phone: '+94772345678',
       job_title: 'Scrum Master',
-      file_path: '/path/to/cv.pdf',
+      cv_file_url: null,
       copied: false
     }
   });
