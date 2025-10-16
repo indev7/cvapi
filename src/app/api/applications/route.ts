@@ -107,9 +107,16 @@ export async function POST(request: NextRequest) {
     // Validate application data
     const validatedData = ApplicationSchema.parse(applicationData)
     
+    // If vacancy_id not provided, try to resolve by job_title
+    let vacancyIdToUse = validatedData.vacancy_id
+    if (!vacancyIdToUse && validatedData.job_title) {
+      const vacancy = await prisma.vacancy.findFirst({ where: { job_title: validatedData.job_title }, orderBy: { created_at: 'desc' } })
+      if (vacancy) vacancyIdToUse = vacancy.id
+    }
+
     // First create the application to get the UUID
     const application = await prisma.application.create({
-      data: validatedData,
+      data: { ...validatedData, vacancy_id: vacancyIdToUse },
       include: {
         vacancy: true
       }

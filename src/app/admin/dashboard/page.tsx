@@ -113,7 +113,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="stat-card stat-yellow">
             <div className="stat-number">{loadingStats ? '…' : stats ? stats.pendingRankings : '-'}</div>
-            <div className="stat-label">Pending Rankings</div>
+            <div className="stat-label">Rankings</div>
           </div>
           <div className="stat-card stat-purple">
             <div className="stat-number">{loadingStats ? '…' : stats ? stats.activeVacancies : '-'}</div>

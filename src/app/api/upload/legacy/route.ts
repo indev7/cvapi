@@ -77,12 +77,16 @@ async function handleLegacyUpload(request: NextRequest, jobTitle: string) {
       }
     }
 
+    // Try to resolve vacancy_id from jobTitle (new records may not provide vacancy_id)
+    const vacancy = await prisma.vacancy.findFirst({ where: { job_title: jobTitle }, orderBy: { created_at: 'desc' } })
+
     // Create application first to get UUID (matches Google Apps Script behavior)
     const application = await prisma.application.create({
       data: {
         job_title: jobTitle,
         email: '', // Empty like in old system
         phone: '', // Empty like in old system
+        vacancy_id: vacancy ? vacancy.id : undefined,
         source: 'web',
         status: 'pending'
       }
