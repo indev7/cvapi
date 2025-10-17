@@ -59,6 +59,32 @@ export default function AdminBlobsPage() {
     return new Date(dateString).toLocaleString()
   }
 
+  const deleteBlob = async (url: string, pathname: string) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${pathname}"?\n\nThis action cannot be undone and will also remove the file reference from the associated application.`
+    )
+
+    if (!confirmDelete) return
+
+    try {
+      const response = await fetch(`/api/admin/blobs?url=${encodeURIComponent(url)}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Remove the deleted blob from local state
+        setBlobs(prev => prev.filter(blob => blob.url !== url))
+        alert('File deleted successfully!')
+      } else {
+        alert(`Failed to delete file: ${data.error}`)
+      }
+    } catch (err) {
+      alert('Network error while deleting file')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -128,7 +154,9 @@ export default function AdminBlobsPage() {
           <li>Files are named with application UUIDs (e.g., uuid.pdf)</li>
           <li>Click &quot;View&quot; to open the CV in a new tab</li>
           <li>Click &quot;Download&quot; to save the file locally</li>
+          <li>Click &quot;Delete&quot; to permanently remove the file (confirmation required)</li>
           <li>Files with Application ID can be traced back to database records</li>
+          <li>⚠️ Deleting a file will also remove its reference from the application record</li>
         </ul>
       </div>
     </div>

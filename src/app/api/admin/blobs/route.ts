@@ -43,3 +43,49 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch CV files' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  // Check authentication
+  const authError = await requireAdminAuth()
+  if (authError) return authError
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const url = searchParams.get('url')
+    
+    if (!url) {
+      return NextResponse.json(
+        { error: 'Missing blob URL parameter' },
+        { status: 400 }
+      )
+    }
+
+    // Delete the blob from Vercel storage
+    await del(url)
+
+    // Extract application ID from filename if possible
+    const applicationId = url.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
+    
+    // Update application record to remove the file URL
+    if (applicationId) {
+      await prisma.application.update({
+        where: { id: applicationId },
+        data: { cv_file_url: null }
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Blob deleted successfully',
+      deletedUrl: url,
+      updatedApplication: applicationId || null
+    })
+
+  } catch (error) {
+    console.error('Error deleting blob:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete blob' },
+      { status: 500 }
+    )
+  }
+}
