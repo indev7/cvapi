@@ -14,13 +14,14 @@ model Vacancy {
   id          Int      @id @default(autoincrement())
   job_title   String   @db.VarChar(255)
   url         String?  @db.Text
-  description String?  @db.Text
+  closing_date DateTime? @db.Timestamp
   status      String   @default("active") @db.VarChar(50)
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now()) @updatedAt
   
   // Relations
   applications Application[]
+  applications_count Int @default(0)
   
   @@map("vacancies")
 }

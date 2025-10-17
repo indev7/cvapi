@@ -74,10 +74,17 @@ async function migrateVacancies() {
     fs.createReadStream(vacanciesFile)
       .pipe(csv())
       .on('data', (row) => {
+        // accept Closing_Date, ClosingDate, or Closing as possible headers
+        const rawClosing = row.Closing_Date || row.ClosingDate || row.Closing || row.closing_date || row.closing
+        let closing_date = undefined
+        if (rawClosing) {
+          const parsed = new Date(rawClosing)
+          if (!isNaN(parsed.getTime())) closing_date = parsed.toISOString()
+        }
         vacancies.push({
           job_title: row.Job_Title || row['Job Title'] || row.job_title,
           url: row.URL || row.url,
-          description: row.Description || row.description || '',
+          closing_date,
           status: 'active'
         });
       })

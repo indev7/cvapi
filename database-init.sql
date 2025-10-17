@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
   id SERIAL PRIMARY KEY,
   job_title VARCHAR(255) NOT NULL,
   url TEXT,
-  description TEXT,
+  -- description column removed
   status VARCHAR(50) DEFAULT 'active',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -70,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_cv_rankings_application_id ON cv_rankings(applica
 CREATE INDEX IF NOT EXISTS idx_vacancies_status ON vacancies(status);
 
 -- Insert some sample vacancies (optional)
-INSERT INTO vacancies (job_title, url, description, status) VALUES 
+INSERT INTO vacancies (job_title, url, status) VALUES 
   ('Software Engineer-Java', 'https://intervest.lk/careers/post/cG9zdDoyODk=/software-engineer-java', 'Java development position with Spring framework experience', 'active'),
   ('Senior Quality Assurance Engineer', 'https://intervest.lk/careers/post/cG9zdDoyODM=/senior-quality-assurance-engineer-manual', 'Manual testing position for senior QA engineer', 'active'),
   ('Scrum Master', 'https://intervest.lk/careers/post/cG9zdDoyODA=/scrum-master', 'Agile project management position', 'active'),

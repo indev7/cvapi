@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { put } from '@vercel/blob'
 import { z } from 'zod'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { validateBearer } from '@/lib/api-security'
 
 // Validation schema
 const ApplicationSchema = z.object({
@@ -14,20 +15,56 @@ const ApplicationSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  // Secure admin-only endpoint - contains sensitive data
-  const authError = await requireAdminAuth()
-  if (authError) return authError
+  // Allow BEARER token or admin auth
+  const authHeader = (request.headers.get('authorization') || '').toLowerCase()
+  if (authHeader.startsWith('bearer ')) {
+    const bearerErr = validateBearer(request)
+    if (bearerErr) return bearerErr
+  } else {
+    const authError = await requireAdminAuth()
+    if (authError) return authError
+  }
 
   try {
     const { searchParams } = new URL(request.url)
     const job_title = searchParams.get('job_title')
     const status = searchParams.get('status')
+    const email = searchParams.get('email')
+    const phone = searchParams.get('phone')
+  const submitted_from = searchParams.get('submitted_from')
+  const submitted_to = searchParams.get('submitted_to')
+  const submitted_date = searchParams.get('submitted_date')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     
-    const where = {
+    // Build prisma where filters. Keep flexible to allow combining filters.
+    const where: any = {
       ...(job_title && { job_title }),
       ...(status && { status })
+    }
+
+    if (email) {
+      where.email = { contains: email, mode: 'insensitive' }
+    }
+    if (phone) {
+      where.phone = { contains: phone }
+    }
+    // Support single-day filter via submitted_date (takes precedence).
+    if (submitted_date) {
+      const dayStart = new Date(submitted_date)
+      dayStart.setHours(0,0,0,0)
+      const dayEnd = new Date(submitted_date)
+      dayEnd.setHours(23,59,59,999)
+      where.created_at = { gte: dayStart, lte: dayEnd }
+    } else if (submitted_from || submitted_to) {
+      where.created_at = {}
+      if (submitted_from) where.created_at.gte = new Date(submitted_from)
+      if (submitted_to) {
+        // include entire day for submitted_to
+        const toDate = new Date(submitted_to)
+        toDate.setHours(23,59,59,999)
+        where.created_at.lte = toDate
+      }
     }
     
     const [applications, total] = await Promise.all([
@@ -77,9 +114,16 @@ export async function POST(request: NextRequest) {
     // Validate application data
     const validatedData = ApplicationSchema.parse(applicationData)
     
+    // If vacancy_id not provided, try to resolve by job_title
+    let vacancyIdToUse = validatedData.vacancy_id
+    if (!vacancyIdToUse && validatedData.job_title) {
+      const vacancy = await prisma.vacancy.findFirst({ where: { job_title: validatedData.job_title }, orderBy: { created_at: 'desc' } })
+      if (vacancy) vacancyIdToUse = vacancy.id
+    }
+
     // First create the application to get the UUID
     const application = await prisma.application.create({
-      data: validatedData,
+      data: { ...validatedData, vacancy_id: vacancyIdToUse },
       include: {
         vacancy: true
       }

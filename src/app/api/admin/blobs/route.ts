@@ -1,44 +1,46 @@
-import { list, del } from '@vercel/blob'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { validateBearer } from '@/lib/api-security'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
-  // Check authentication
-  const authError = await requireAdminAuth()
-  if (authError) return authError
+  // Allow BEARER token or admin auth
+  const authHeader = (request.headers.get('authorization') || '').toLowerCase()
+  if (authHeader.startsWith('bearer ')) {
+    const bearerErr = validateBearer(request)
+    if (bearerErr) return bearerErr
+  } else {
+    const authError = await requireAdminAuth()
+    if (authError) return authError
+  }
+
   try {
     const { searchParams } = new URL(request.url)
-    const prefix = searchParams.get('prefix') || ''
+    const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '100')
-    
-    // List all blobs with optional prefix filter
-    const { blobs } = await list({
-      prefix,
-      limit
-    })
-    
-    // Format blob data for easier viewing
-    const formattedBlobs = blobs.map(blob => ({
-      url: blob.url,
-      pathname: blob.pathname,
-      size: blob.size,
-      uploadedAt: blob.uploadedAt,
-      // Extract UUID if it matches our naming pattern
-      applicationId: blob.pathname.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1] || null
-    }))
-    
+
+    const where = { cv_file_url: { not: null } }
+
+    const [total, applications] = await Promise.all([
+      prisma.application.count({ where }),
+      prisma.application.findMany({
+        where,
+        include: { vacancy: true },
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ])
+
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+
     return NextResponse.json({
-      blobs: formattedBlobs,
-      total: blobs.length,
-      hasMore: blobs.length === limit
+      applications,
+      pagination: { page, limit, total, totalPages }
     })
   } catch (error) {
-    console.error('Error listing blobs:', error)
-    return NextResponse.json(
-      { error: 'Failed to list blobs' },
-      { status: 500 }
-    )
+    console.error('Error fetching CV files from DB:', error)
+    return NextResponse.json({ error: 'Failed to fetch CV files' }, { status: 500 })
   }
 }
 

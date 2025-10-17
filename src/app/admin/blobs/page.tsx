@@ -2,33 +2,44 @@
 
 import { useState, useEffect } from 'react'
 
-interface Blob {
-  url: string
-  pathname: string
-  size: number
-  uploadedAt: string
-  applicationId: string | null
+interface ApplicationRow {
+  id: string
+  email?: string | null
+  phone?: string | null
+  job_title: string
+  vacancy?: { id: number; job_title?: string } | null
+  cv_file_url?: string | null
+  created_at: string
 }
 
 export default function AdminBlobsPage() {
-  const [blobs, setBlobs] = useState<Blob[]>([])
+  const [rows, setRows] = useState<ApplicationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 100
+  const [totalPages, setTotalPages] = useState<number>(1)
 
   useEffect(() => {
-    fetchBlobs()
-  }, [])
+    fetchBlobs(page)
+  }, [page])
 
-  const fetchBlobs = async () => {
+  const fetchBlobs = async (pageNumber = 1) => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/blobs')
-      const data = await response.json()
-      
-      if (response.ok) {
-        setBlobs(data.blobs)
+      const proxyRes = await fetch('/api/internal/proxy', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: `/api/admin/blobs?page=${pageNumber}&limit=${perPage}`, method: 'GET' })
+      })
+      const data = await proxyRes.json()
+
+      if (proxyRes.ok) {
+        setRows(data.applications || [])
+        setTotalPages(data.pagination?.totalPages || 1)
       } else {
-        setError(data.error || 'Failed to fetch blobs')
+        setError(data.error || 'Failed to fetch CV files')
       }
     } catch (err) {
       setError('Network error')
@@ -91,95 +102,44 @@ export default function AdminBlobsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Blob Storage Browser</h1>
-        <button
-          onClick={fetchBlobs}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Refresh
-        </button>
+    <div className="admin-container">
+      <div className="admin-row space-between" style={{ marginBottom: '1rem' }}>
+        <h1 className="page-title">Blob Storage Browser</h1>
+        <div className="admin-actions">
+          <div className="muted">Page {page} / {totalPages}</div>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn btn-muted">Prev</button>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="btn btn-muted">Next</button>
+          <button onClick={() => fetchBlobs(page)} className="btn btn-primary">Refresh</button>
+        </div>
       </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="px-6 py-4 bg-gray-50 border-b">
-          <h2 className="text-xl font-semibold">CV Files ({blobs.length})</h2>
-        </div>
-
-        {blobs.length === 0 ? (
-          <div className="px-6 py-8 text-center text-gray-500">
-            No files found in blob storage
-          </div>
+      <div className="admin-card">
+        {rows.length === 0 ? (
+          <div className="muted">No CV files found</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="admin-table">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    File
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Application ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uploaded
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th>Application ID</th>
+                  <th>Job Title</th>
+                  <th>Vacancy</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>CV File</th>
+                  <th>Uploaded</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {blobs.map((blob, index) => (
-                  <tr key={blob.url} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {blob.pathname}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {blob.applicationId || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatFileSize(blob.size)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatDate(blob.uploadedAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <a
-                        href={blob.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-900 mr-4"
-                      >
-                        View
-                      </a>
-                      <a
-                        href={blob.url}
-                        download
-                        className="text-green-600 hover:text-green-900 mr-4"
-                      >
-                        Download
-                      </a>
-                      <button
-                        onClick={() => deleteBlob(blob.url, blob.pathname)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete file permanently"
-                      >
-                        Delete
-                      </button>
-                    </td>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.id}>
+                    <td>{row.id}</td>
+                    <td>{row.job_title}</td>
+                    <td>{row.vacancy?.job_title || '\u2014'}</td>
+                    <td>{row.email || '\u2014'}</td>
+                    <td>{row.phone || '\u2014'}</td>
+                    <td>{row.cv_file_url ? (<a href={row.cv_file_url} target="_blank" rel="noreferrer">View</a>) : '\u2014'}</td>
+                    <td>{new Date(row.created_at).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -188,9 +148,9 @@ export default function AdminBlobsPage() {
         )}
       </div>
 
-      <div className="mt-6 text-sm text-gray-600">
+      <div style={{ marginTop: '1rem', color: 'var(--muted-text)', fontSize: '0.9rem' }}>
         <p>💡 Tips:</p>
-        <ul className="list-disc list-inside mt-2 space-y-1">
+        <ul>
           <li>Files are named with application UUIDs (e.g., uuid.pdf)</li>
           <li>Click &quot;View&quot; to open the CV in a new tab</li>
           <li>Click &quot;Download&quot; to save the file locally</li>
