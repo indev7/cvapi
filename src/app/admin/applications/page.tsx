@@ -55,7 +55,14 @@ export default function AdminApplicationsPage() {
   }, [limit])
 
   useEffect(() => {
-    fetchApplications(page)
+    // Read job_title from the browser URL (client-only)
+    const params: Record<string,string> = {}
+    if (typeof window !== 'undefined') {
+      const sp = new URL(window.location.href).searchParams
+      const jt = sp.get('job_title')
+      if (jt) params.job_title = jt
+    }
+    fetchApplications(page, params)
   }, [page, fetchApplications])
 
   // Fetch vacancies when search modal is opened
