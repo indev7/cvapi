@@ -175,11 +175,26 @@ export default function AdminVacanciesPage() {
                 setSaving(true)
                 setModalError(null)
                 try {
+                  // Normalize URL: if invalid, try prefixing https://; if still invalid, omit it and warn.
+                  const normalizeUrl = (u?: string) => {
+                    if (!u) return undefined
+                    const t = u.trim()
+                    if (t.length === 0) return undefined
+                    try { new URL(t); return t } catch (e) {
+                      try { const pref = 'https://' + t; new URL(pref); return pref } catch (e2) { return undefined }
+                    }
+                  }
+
+                  const normalizedUrl = normalizeUrl(formUrl)
                   const payload = {
                     job_title: formJobTitle.trim(),
-                    url: formUrl && formUrl.trim() !== '' ? formUrl.trim() : undefined,
+                    url: normalizedUrl,
                     closing_date: formClosingDate && formClosingDate.trim() !== '' ? formClosingDate : undefined,
                     status: (formStatus === 'active' || formStatus === 'inactive') ? formStatus : 'active'
+                  }
+                  if (formUrl && !normalizedUrl) {
+                    // Non-blocking UI warning that URL was ignored
+                    setModalError('Provided JD URL was not a valid URL and will be omitted')
                   }
 
                   let res
