@@ -67,6 +67,34 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
   return response
 }
 
+// Validate a BEARER token provided in the Authorization header.
+// If the header matches process.env.BEARER_TOKEN, returns null (allowed).
+// Otherwise returns a NextResponse with 401 status.
+export function validateBearer(request: NextRequest): NextResponse | null {
+  const auth = (request.headers.get('authorization') || '').trim()
+
+  // If no Authorization header present, return an explicit 401 so callers
+  // can distinguish between "no bearer provided" and "bearer valid".
+  if (!auth) {
+    return NextResponse.json({ error: 'Missing Authorization header (Bearer token required)' }, { status: 401 })
+  }
+
+  if (!auth.toLowerCase().startsWith('bearer ')) {
+    return NextResponse.json({ error: 'Authorization header must be a Bearer token' }, { status: 401 })
+  }
+
+  const token = auth.slice(7).trim()
+  const expected = process.env.BEARER_TOKEN || ''
+
+  if (!expected) {
+    // If no token configured, reject bearer usage (force admin auth paths)
+    return NextResponse.json({ error: 'Bearer token not configured on server' }, { status: 401 })
+  }
+
+  if (token === expected) return null // valid bearer
+  return NextResponse.json({ error: 'Invalid bearer token' }, { status: 401 })
+}
+
 export function sanitizeInput(input: any): any {
   if (typeof input === 'string') {
     // Basic XSS prevention

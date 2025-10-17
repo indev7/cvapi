@@ -1,10 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { validateBearer } from '@/lib/api-security'
 
-export async function GET() {
-  const authError = await requireAdminAuth()
-  if (authError) return authError
+export async function GET(request: NextRequest) {
+  // Accept either Bearer token or admin cookie
+  const authHeader = (request.headers.get('authorization') || '').toLowerCase()
+  if (authHeader.startsWith('bearer ')) {
+    const bearerErr = validateBearer(request)
+    if (bearerErr) return bearerErr
+  } else {
+    const authError = await requireAdminAuth()
+    if (authError) return authError
+  }
 
   try {
     const [totalApplications, cvFilesCount, pendingRankings, activeVacancies] = await Promise.all([

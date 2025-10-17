@@ -31,9 +31,14 @@ export default function AdminRankingsPage() {
   const fetchRankings = async (pageNumber = 1) => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/admin/rankings?page=${pageNumber}&limit=${perPage}`, { credentials: 'include' })
-      const data = await res.json()
-      if (!res.ok) {
+      const proxyRes = await fetch(`/api/internal/proxy`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: `/api/admin/rankings?page=${pageNumber}&limit=${perPage}`, method: 'GET' })
+      })
+      const data = await proxyRes.json()
+      if (!proxyRes.ok) {
         setError(data.error || 'Failed to load rankings')
         return
       }

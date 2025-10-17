@@ -40,8 +40,13 @@ export default function AdminApplicationsPage() {
     setLoading(true)
     try {
       const qs = new URLSearchParams({ page: String(p), limit: String(limit), ...params })
-      const res = await fetch(`/api/applications?${qs.toString()}`, { credentials: 'include' })
-      const data = await res.json()
+      const proxyRes = await fetch('/api/internal/proxy', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: `/api/applications?${qs.toString()}`, method: 'GET' })
+      })
+      const data = await proxyRes.json()
       setApplications(data.applications || [])
       if (data.pagination) {
         setTotalPages(data.pagination.totalPages)
@@ -55,14 +60,29 @@ export default function AdminApplicationsPage() {
   }, [limit])
 
   useEffect(() => {
-    // Read job_title from the browser URL (client-only)
-    const params: Record<string,string> = {}
-    if (typeof window !== 'undefined') {
-      const sp = new URL(window.location.href).searchParams
-      const jt = sp.get('job_title')
-      if (jt) params.job_title = jt
+    const handleLocationChange = () => {
+      const params: Record<string,string> = {}
+      try {
+        const sp = new URL(window.location.href).searchParams
+        const jt = sp.get('job_title')
+        if (jt) params.job_title = jt
+      } catch (e) {
+        // ignore
+      }
+      fetchApplications(page, params)
     }
-    fetchApplications(page, params)
+
+    // Listen for browser navigation and our custom event
+    window.addEventListener('popstate', handleLocationChange)
+    window.addEventListener('locationchange', handleLocationChange)
+
+    // Initial load
+    handleLocationChange()
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange)
+      window.removeEventListener('locationchange', handleLocationChange)
+    }
   }, [page, fetchApplications])
 
   // Fetch vacancies when search modal is opened

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { validateBearer } from '@/lib/api-security'
 
 // Validation schemas
 const VacancySchema = z.object({
@@ -11,10 +12,16 @@ const VacancySchema = z.object({
   status: z.enum(['active', 'inactive']).default('active')
 })
 
-export async function GET() {
-  // Secure admin-only endpoint
-  const authError = await requireAdminAuth()
-  if (authError) return authError
+export async function GET(request: NextRequest) {
+  // Allow either admin auth or BEARER token for machine access
+  const authHeader = (request.headers.get('authorization') || '').toLowerCase()
+  if (authHeader.startsWith('bearer ')) {
+    const bearerErr = validateBearer(request)
+    if (bearerErr) return bearerErr
+  } else {
+    const authError = await requireAdminAuth()
+    if (authError) return authError
+  }
 
   try {
     const vacancies = await prisma.vacancy.findMany({

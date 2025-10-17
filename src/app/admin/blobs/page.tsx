@@ -27,10 +27,15 @@ export default function AdminBlobsPage() {
   const fetchBlobs = async (pageNumber = 1) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/blobs?page=${pageNumber}&limit=${perPage}`, { credentials: 'include' })
-      const data = await response.json()
+      const proxyRes = await fetch('/api/internal/proxy', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: `/api/admin/blobs?page=${pageNumber}&limit=${perPage}`, method: 'GET' })
+      })
+      const data = await proxyRes.json()
 
-      if (response.ok) {
+      if (proxyRes.ok) {
         setRows(data.applications || [])
         setTotalPages(data.pagination?.totalPages || 1)
       } else {

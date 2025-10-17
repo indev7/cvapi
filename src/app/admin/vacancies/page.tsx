@@ -34,9 +34,14 @@ export default function AdminVacanciesPage() {
   const fetchVacancies = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/vacancies', { credentials: 'include' })
-      const data = await res.json()
-      if (!res.ok) {
+      const proxyRes = await fetch('/api/internal/proxy', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/api/vacancies', method: 'GET' })
+      })
+      const data = await proxyRes.json()
+      if (!proxyRes.ok) {
         setError(data.error || 'Failed to load vacancies')
         return
       }

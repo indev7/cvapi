@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { put } from '@vercel/blob'
 import { z } from 'zod'
 import { requireAdminAuth } from '@/lib/admin-auth'
+import { validateBearer } from '@/lib/api-security'
 
 // Validation schema
 const ApplicationSchema = z.object({
@@ -14,9 +15,15 @@ const ApplicationSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  // Secure admin-only endpoint - contains sensitive data
-  const authError = await requireAdminAuth()
-  if (authError) return authError
+  // Allow BEARER token or admin auth
+  const authHeader = (request.headers.get('authorization') || '').toLowerCase()
+  if (authHeader.startsWith('bearer ')) {
+    const bearerErr = validateBearer(request)
+    if (bearerErr) return bearerErr
+  } else {
+    const authError = await requireAdminAuth()
+    if (authError) return authError
+  }
 
   try {
     const { searchParams } = new URL(request.url)

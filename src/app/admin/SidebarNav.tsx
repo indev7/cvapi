@@ -33,9 +33,14 @@ export default function SidebarNav() {
     let mounted = true
     ;(async () => {
       try {
-        const res = await fetch('/api/vacancies', { credentials: 'include' })
-        if (!res.ok) throw new Error('Failed to load vacancies')
-        const data = await res.json()
+        const proxyRes = await fetch('/api/internal/proxy', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/api/vacancies', method: 'GET' })
+        })
+        if (!proxyRes.ok) throw new Error('Failed to load vacancies')
+        const data = await proxyRes.json()
         if (!mounted) return
         if (Array.isArray(data)) {
           setVacancies(data.map((v: any) => ({ id: v.id, job_title: v.job_title })))
@@ -59,7 +64,7 @@ export default function SidebarNav() {
             <div className="muted">Loading...</div>
           ) : (
             vacancies.map(v => (
-              <a key={v.id} href="#" className="admin-sub-link" onClick={(e) => { e.preventDefault(); router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`) }}>{v.job_title}</a>
+              <a key={v.id} href="#" className="admin-sub-link" onClick={(e) => { e.preventDefault(); router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`); try { window.dispatchEvent(new Event('locationchange')) } catch {} }}>{v.job_title}</a>
             ))
           )}
         </div>
