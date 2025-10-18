@@ -75,7 +75,7 @@ export default function AdminBlobsPage() {
 
       if (response.ok) {
         // Remove the deleted blob from local state
-        setBlobs(prev => prev.filter(blob => blob.url !== url))
+        setRows((prev: ApplicationRow[]) => prev.filter((blob) => blob.cv_file_url !== url))
         alert('File deleted successfully!')
       } else {
         alert(`Failed to delete file: ${data.error}`)

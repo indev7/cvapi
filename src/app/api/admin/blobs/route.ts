@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminAuth } from '@/lib/admin-auth'
 import { validateBearer } from '@/lib/api-security'
 import { prisma } from '@/lib/prisma'
+import { deleteCVFile } from '@/lib/cv-utils'
 
 export async function GET(request: NextRequest) {
   // Allow BEARER token or admin auth
@@ -60,8 +61,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete the blob from Vercel storage
-    await del(url)
+  // Delete the blob from Vercel storage
+  await deleteCVFile(url)
 
     // Extract application ID from filename if possible
     const applicationId = url.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)?.[1]
