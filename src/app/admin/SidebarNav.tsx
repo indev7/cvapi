@@ -6,7 +6,7 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 
 export default function SidebarNav() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [vacancies, setVacancies] = useState<Array<{ id: number; job_title?: string | null }>>([])
+  const [vacancies, setVacancies] = useState<Array<{ id: number; job_title?: string | null; applicationCount?: number }>>([])
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -43,7 +43,7 @@ export default function SidebarNav() {
         const data = await proxyRes.json()
         if (!mounted) return
         if (Array.isArray(data)) {
-          setVacancies(data.map((v: any) => ({ id: v.id, job_title: v.job_title })))
+          setVacancies(data.map((v: any) => ({ id: v.id, job_title: v.job_title, applicationCount: v.applicationCount ?? v.applicationCount ?? 0 })))
         }
       } catch (err) {
         console.error('Failed to fetch vacancies for sidebar', err)
@@ -57,19 +57,49 @@ export default function SidebarNav() {
 
   return (
     <nav>
-      <a href="#" onClick={(e) => { e.preventDefault(); router.push('/admin/applications'); setOpen(!open) }} className="admin-nav-link">Applications</a>
+      {/* Top-level nav items - visually distinct */}
+      <a
+        href="#"
+        onClick={(e) => { e.preventDefault(); router.push('/admin/applications'); setOpen(!open) }}
+        className="admin-nav-link top-level"
+        style={{ fontWeight: 700, fontSize: '0.98rem', display: 'block', padding: '0.5rem 0' }}
+      >
+        Applications
+      </a>
+
       {open && (
         <div className="sidebar-vacancies">
           {vacancies.length === 0 ? (
             <div className="muted">Loading...</div>
           ) : (
             vacancies.map(v => (
-              <a key={v.id} href="#" className="admin-sub-link" onClick={(e) => { e.preventDefault(); router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`); try { window.dispatchEvent(new Event('locationchange')) } catch {} }}>{v.job_title}</a>
+              <a
+                key={v.id}
+                href="#"
+                className="admin-sub-link secondary"
+                onClick={(e) => { e.preventDefault(); router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`); try { window.dispatchEvent(new Event('locationchange')) } catch {} }}
+                style={{ display: 'block', padding: '0.25rem 0 0.25rem 0.6rem', fontSize: '0.92rem', color: 'var(--muted-text)', overflow: 'hidden' }}
+              >
+                <span className="vacancy-inner" style={{ display: 'inline-block', width: '100%', verticalAlign: 'middle' }}>
+                  <span className="marquee" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', gap: '0.4rem' }}>
+                    <span className="title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.job_title}</span>
+                    <span className="count" style={{ color: 'var(--muted-text)', fontSize: '0.85rem', marginLeft: '0.4rem', flex: '0 0 auto' }}>({v.applicationCount ?? 0})</span>
+                  </span>
+                </span>
+              </a>
             ))
           )}
         </div>
       )}
-      <Link href="/admin/vacancies" className="admin-nav-link">Vacancies</Link>
+
+      {/* Top-level Vacancies link */}
+      <Link
+        href="/admin/vacancies"
+        className="admin-nav-link top-level"
+        style={{ fontWeight: 700, fontSize: '0.98rem', display: 'block', padding: '0.5rem 0' }}
+      >
+        Vacancies
+      </Link>
     </nav>
   )
 }

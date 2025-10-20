@@ -164,3 +164,60 @@ tbody tr:hover { background: rgba(6, 182, 212, 0.05); }
     text-wrap: balance;
   }
 }
+
+/* Sidebar vacancy single-line with ellipsis and marquee on hover */
+
+.sidebar-vacancies a {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.sidebar-vacancies .vacancy-inner { display: flex; align-items: center; gap: 0.4rem; }
+.sidebar-vacancies .marquee {
+  display: inline-block;
+  max-width: calc(100% - 2.2rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-vacancies .title {
+  display: inline-block;
+  max-width: calc(100% - 2.2rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-vacancies .count { flex: 0 0 auto; margin-left: 0.4rem; }
+
+/* On hover, allow overflow to be visible and remove ellipsis so the marquee reveals full text */
+.sidebar-vacancies a:hover {
+  overflow: visible;
+}
+.sidebar-vacancies a:hover .marquee {
+  overflow: visible;
+  text-overflow: clip;
+  animation: marquee 6s linear 1;
+}
+/* Also remove ellipsis and allow overflow for the title during hover so the
+   entire title+count can scroll together without showing '...' */
+.sidebar-vacancies a:hover .title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  max-width: none;
+  width: auto;
+}
+
+/* Ensure marquee itself isn't constrained during hover so it can reveal the full text */
+.sidebar-vacancies a:hover .marquee {
+  max-width: none;
+  width: auto;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  10% { transform: translateX(0%); }
+  50% { transform: translateX(-60%); }
+  90% { transform: translateX(0%); }
+  100% { transform: translateX(0%); }
+}
