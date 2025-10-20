@@ -52,7 +52,22 @@ export default function AdminApplicationsPage() {
         body: JSON.stringify({ path: `/api/applications?${qs.toString()}`, method: 'GET' })
       })
       const data = await proxyRes.json()
-      setApplications(data.applications || [])
+      let apps = data.applications || []
+      // If this fetch was requested for a specific vacancy/job_title,
+      // sort by ranking.total_score desc with unranked applications at the bottom.
+      if (params.job_title) {
+        apps = apps.slice().sort((a: any, b: any) => {
+          const as = a?.ranking?.total_score
+          const bs = b?.ranking?.total_score
+          const aHas = typeof as === 'number'
+          const bHas = typeof bs === 'number'
+          if (!aHas && !bHas) return 0
+          if (!aHas) return 1 // a unranked -> after b
+          if (!bHas) return -1 // b unranked -> after a
+          return bs - as // descending
+        })
+      }
+      setApplications(apps)
       if (data.pagination) {
         setTotalPages(data.pagination.totalPages)
         setTotalCount(data.pagination.total || null)
