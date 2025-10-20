@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 export default function SidebarNav() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
@@ -60,7 +60,7 @@ export default function SidebarNav() {
       {/* Top-level nav items - visually distinct */}
       <a
         href="#"
-        onClick={(e) => { e.preventDefault(); router.push('/admin/applications'); setOpen(!open) }}
+        onClick={async (e) => { e.preventDefault(); await router.push('/admin/applications'); setOpen(!open) }}
         className="admin-nav-link top-level"
         style={{ fontWeight: 700, fontSize: '0.98rem', display: 'block', padding: '0.5rem 0' }}
       >
@@ -75,9 +75,15 @@ export default function SidebarNav() {
             vacancies.map(v => (
               <a
                 key={v.id}
-                href="#"
+                href={`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`}
                 className="admin-sub-link secondary"
-                onClick={(e) => { e.preventDefault(); router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`); try { window.dispatchEvent(new Event('locationchange')) } catch {} }}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  await router.push(`/admin/applications?job_title=${encodeURIComponent(v.job_title || '')}`)
+                  try {
+                    window.dispatchEvent(new CustomEvent('locationchange', { detail: { job_title: v.job_title } }))
+                  } catch (err) { /* ignore */ }
+                }}
                 style={{ display: 'block', padding: '0.25rem 0 0.25rem 0.6rem', fontSize: '0.92rem', color: 'var(--muted-text)', overflow: 'hidden' }}
               >
                 <span className="vacancy-inner" style={{ display: 'inline-block', width: '100%', verticalAlign: 'middle' }}>

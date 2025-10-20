@@ -65,9 +65,18 @@ export default function AdminApplicationsPage() {
   }, [limit])
 
   useEffect(() => {
-    const handleLocationChange = () => {
+    const handleLocationChange = (evt?: any) => {
       const params: Record<string,string> = {}
       try {
+        // Prefer job_title from event.detail when provided (avoids router timing races)
+        const jtFromEvent = evt?.detail?.job_title
+        if (jtFromEvent) {
+          params.job_title = jtFromEvent
+          setCurrentHeading(jtFromEvent)
+          fetchApplications(page, params)
+          return
+        }
+
         const sp = new URL(window.location.href).searchParams
         const jt = sp.get('job_title')
         if (jt) {
@@ -85,14 +94,14 @@ export default function AdminApplicationsPage() {
 
     // Listen for browser navigation and our custom event
     window.addEventListener('popstate', handleLocationChange)
-    window.addEventListener('locationchange', handleLocationChange)
+    window.addEventListener('locationchange', handleLocationChange as EventListener)
 
     // Initial load
     handleLocationChange()
 
     return () => {
       window.removeEventListener('popstate', handleLocationChange)
-      window.removeEventListener('locationchange', handleLocationChange)
+      window.removeEventListener('locationchange', handleLocationChange as EventListener)
     }
   }, [page, fetchApplications])
 
