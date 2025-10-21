@@ -8,17 +8,22 @@ export async function POST(request: NextRequest) {
     // Get credentials from environment
     const adminUsername = process.env.ADMIN_USERNAME
     const adminPassword = process.env.ADMIN_PASSWORD
-    
-    if (!adminUsername || !adminPassword) {
-      console.error('Admin credentials not configured in environment variables')
+    const hrUsername = process.env.HR_USER_NAME
+    const hrPassword = process.env.HR_USER_PW
+
+    if ((!adminUsername || !adminPassword) && (!hrUsername || !hrPassword)) {
+      console.error('No admin or HR credentials configured in environment variables')
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
       )
     }
-    
-    // Validate credentials
-    if (username === adminUsername && password === adminPassword) {
+
+    // Validate credentials: allow either admin creds or HR creds
+    const isAdmin = adminUsername && adminPassword && username === adminUsername && password === adminPassword
+    const isHR = hrUsername && hrPassword && username === hrUsername && password === hrPassword
+
+    if (isAdmin || isHR) {
       // Create response with authentication cookie
       const response = NextResponse.json({ success: true })
       

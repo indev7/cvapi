@@ -14,6 +14,9 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_rw_9sV2nO7zc9Zig2xf_E2MMPBs1DfsOuuDUkz0BJ1v9W7
 ```
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=1millionCats
+# Optional HR credentials (grant HR access to admin panel)
+HR_USER_NAME=hr@intervest.lk
+HR_USER_PW=hrInterVest_7^x
 ```
 
 ### **NextJS Configuration**
@@ -76,6 +79,10 @@ GOOGLE_APPS_SCRIPT_URL=https://your-app-name.vercel.app/api/upload/legacy
 ```
 Username: admin
 Password: 1millionCats
+
+Optional HR login:
+Username: hr@intervest.lk
+Password: hrInterVest_7^x
 ```
 
 ### **Admin URLs**
