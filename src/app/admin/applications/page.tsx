@@ -17,6 +17,10 @@ interface Application {
   vacancy?: Vacancy | null
   cv_file_url?: string | null
   created_at: string
+  ranking?: {
+    total_score?: number | null
+    final_score?: number | null
+  } | null
 }
 
 export default function AdminApplicationsPage() {
@@ -35,6 +39,7 @@ export default function AdminApplicationsPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [vacanciesLoading, setVacanciesLoading] = useState(false)
   const [vacanciesError, setVacanciesError] = useState<string | null>(null)
+  const [currentHeading, setCurrentHeading] = useState<string | null>(null)
 
   const fetchApplications = useCallback(async (p = 1, params: Record<string,string> = {}) => {
     setLoading(true)
@@ -47,7 +52,22 @@ export default function AdminApplicationsPage() {
         body: JSON.stringify({ path: `/api/applications?${qs.toString()}`, method: 'GET' })
       })
       const data = await proxyRes.json()
-      setApplications(data.applications || [])
+      let apps = data.applications || []
+      // If this fetch was requested for a specific vacancy/job_title,
+      // sort by ranking.total_score desc with unranked applications at the bottom.
+      if (params.job_title) {
+        apps = apps.slice().sort((a: any, b: any) => {
+          const as = a?.ranking?.total_score
+          const bs = b?.ranking?.total_score
+          const aHas = typeof as === 'number'
+          const bHas = typeof bs === 'number'
+          if (!aHas && !bHas) return 0
+          if (!aHas) return 1 // a unranked -> after b
+          if (!bHas) return -1 // b unranked -> after a
+          return bs - as // descending
+        })
+      }
+      setApplications(apps)
       if (data.pagination) {
         setTotalPages(data.pagination.totalPages)
         setTotalCount(data.pagination.total || null)
@@ -60,28 +80,43 @@ export default function AdminApplicationsPage() {
   }, [limit])
 
   useEffect(() => {
-    const handleLocationChange = () => {
+    const handleLocationChange = (evt?: any) => {
       const params: Record<string,string> = {}
       try {
+        // Prefer job_title from event.detail when provided (avoids router timing races)
+        const jtFromEvent = evt?.detail?.job_title
+        if (jtFromEvent) {
+          params.job_title = jtFromEvent
+          setCurrentHeading(jtFromEvent)
+          fetchApplications(page, params)
+          return
+        }
+
         const sp = new URL(window.location.href).searchParams
         const jt = sp.get('job_title')
-        if (jt) params.job_title = jt
+        if (jt) {
+          params.job_title = jt
+          setCurrentHeading(jt)
+        } else {
+          setCurrentHeading(null)
+        }
       } catch (e) {
         // ignore
+        setCurrentHeading(null)
       }
       fetchApplications(page, params)
     }
 
     // Listen for browser navigation and our custom event
     window.addEventListener('popstate', handleLocationChange)
-    window.addEventListener('locationchange', handleLocationChange)
+    window.addEventListener('locationchange', handleLocationChange as EventListener)
 
     // Initial load
     handleLocationChange()
 
     return () => {
       window.removeEventListener('popstate', handleLocationChange)
-      window.removeEventListener('locationchange', handleLocationChange)
+      window.removeEventListener('locationchange', handleLocationChange as EventListener)
     }
   }, [page, fetchApplications])
 
@@ -123,7 +158,7 @@ export default function AdminApplicationsPage() {
   return (
     <div className="admin-container">
       <div className="admin-row" style={{ marginBottom: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-  <h1 className="page-title">Intervest Job Applications ({totalCount ?? applications.length})</h1>
+  <h1 className="page-title">{currentHeading ? `${currentHeading} (${totalCount ?? applications.length})` : `Intervest Job Applications (${totalCount ?? applications.length})`}</h1>
         <div className="admin-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button onClick={() => setShowSearch(true)} className="btn btn-muted">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ marginRight: 6 }}>
@@ -142,6 +177,8 @@ export default function AdminApplicationsPage() {
               setSearchEmail('')
               setSearchPhone('')
               setSearchDate('')
+              // reset heading
+              setCurrentHeading(null)
               // refresh list
               setPage(1)
               await fetchApplications(1)
@@ -160,24 +197,24 @@ export default function AdminApplicationsPage() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Applicant Email</th>
-                  <th>Applicant Phone</th>
                   <th>Job Title</th>
+                  <th>Email</th>
+                  <th>Phone</th>
                   <th>Submitted Date</th>
-                  <th>View CV</th>
+                  <th>Score</th>
+                  <th>CV</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.map(app => (
                   <tr key={app.id} style={{ cursor: 'pointer' }} onClick={() => window.location.href = `/admin/rankings/${app.id}`}>
                     <td>
-                      <Link href={`/admin/rankings/${app.id}`} className="admin-link" onClick={(e) => e.stopPropagation()}>{app.id}</Link>
+                      <Link href={`/admin/rankings/${app.id}`} className="admin-link" onClick={(e) => e.stopPropagation()}>{app.vacancy?.job_title || app.job_title || '\u2014'}</Link>
                     </td>
                     <td>{app.email || '\u2014'}</td>
                     <td>{app.phone || '\u2014'}</td>
-                    <td>{app.vacancy?.job_title || app.job_title}</td>
                     <td>{new Date(app.created_at).toLocaleString()}</td>
+                    <td>{typeof app.ranking?.total_score === 'number' ? app.ranking?.total_score : '\u2014'}</td>
                     <td>{app.cv_file_url ? (<a href={app.cv_file_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>View</a>) : '\u2014'}</td>
                   </tr>
                 ))}
