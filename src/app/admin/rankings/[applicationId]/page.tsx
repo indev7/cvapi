@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 
 export default async function RankingDetailPage({ params }: any) {
   // `params` can be a promise in some Next.js runtime cases; await it before using.
@@ -29,7 +30,17 @@ export default async function RankingDetailPage({ params }: any) {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">{applicantEmail}</h1>
-        <div className="mt-6 mb-2 font-semibold">Job: {ranking.application.job_title}</div>
+        <div className="mt-6 mb-2 font-semibold">Job: 
+          <Link href={`/admin/applications?job_title=${encodeURIComponent(ranking.application.job_title || '')}`} className="underline text-indigo-600">
+            {ranking.application.job_title}
+          </Link>
+        </div>
+        {/* client-side highlight handshake for sidebar:
+            - set a global so client components that hydrate later can read it
+            - dispatch the same event after a short timeout so listeners that
+              are already mounted receive it immediately
+        */}
+        <script dangerouslySetInnerHTML={{ __html: `window.__SIDEBAR_HIGHLIGHT = ${JSON.stringify(ranking.application.job_title)}; setTimeout(function(){ try{ window.dispatchEvent(new CustomEvent('sidebar-highlight', { detail: { job_title: ${JSON.stringify(ranking.application.job_title)} } })); }catch(e){} }, 60);` }} />
       </div>
 
       <div className="card p-6">

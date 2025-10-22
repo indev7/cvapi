@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 interface RankingRow {
   id: number
@@ -82,7 +83,13 @@ export default function AdminRankingsPage() {
               <tr key={r.id} className="bg-white">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.id}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.application_id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.application?.job_title}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {r.application?.job_title ? (
+                    <Link href={`/admin/applications?job_title=${encodeURIComponent(r.application.job_title)}`} className="text-indigo-600 underline">
+                      {r.application.job_title}
+                    </Link>
+                  ) : '\u2014'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.total_score}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{r.final_score}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(r.ranked_at).toLocaleString()}</td>
